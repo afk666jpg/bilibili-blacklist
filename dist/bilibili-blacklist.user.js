@@ -1918,7 +1918,7 @@
    * @returns {boolean} 如果是主页则返回true，否则返回false。
    */
   function isCurrentPageMain() {
-    return location.pathname === "/";
+    return location.pathname === "/" || location.pathname === "/index.html";
   }
 
   /**
