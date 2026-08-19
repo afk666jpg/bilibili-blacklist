@@ -553,14 +553,12 @@ function loadUiModule() {
     managerPanel.style.transform = "translate(-50%, -50%)";
     managerPanel.style.width = "500px";
     managerPanel.style.maxHeight = "80vh";
-    managerPanel.style.backgroundColor = "#fff";
     managerPanel.style.borderRadius = "8px";
     managerPanel.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.15)";
     managerPanel.style.zIndex = "99999";
     managerPanel.style.overflow = "hidden";
     managerPanel.style.display = "none"; // 默认隐藏
     managerPanel.style.flexDirection = "column";
-    managerPanel.style.backgroundColor = "#ffffffee"; // 半透明背景
 
     // 创建标签容器
     const tabContainer = document.createElement("div");
@@ -873,6 +871,9 @@ function loadUiModule() {
         /* 面板样式 */
         #bilibili-blacklist-manager-panel {
             font-size: 15px;
+            color:var(--text2,#000);
+            background-color:var(--bg1,#fff);
+            opacity: 0.85;
         }
         /* 按钮悬停效果 */
         #bilibili-blacklist-manager-panel button {

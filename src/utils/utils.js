@@ -39,7 +39,7 @@ function loadUtilsModule() {
     if (tagNameList.length === 0) tagListLastTime = 0; //确保初始为空时进行更新
 
     const now = Date.now();
-    if (now - tagListLastTime < 86400000) {
+    if (now - tagListLastTime < 6000) {
       console.log("[bilibili-blacklist] 标签名列表最近已更新，跳过本次更新。");
       return;
     }
