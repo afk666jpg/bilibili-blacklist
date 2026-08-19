@@ -1650,6 +1650,9 @@
             background-color:var(--bg1,#fff);
             opacity: 0.85;
         }
+        #bilibili-blacklist-manager-panel h4,h3 {
+             color:var(--text2,#000);
+        }
         /* 按钮悬停效果 */
         #bilibili-blacklist-manager-panel button {
             transition: background-color 0.2s;
