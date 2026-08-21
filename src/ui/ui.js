@@ -1,6 +1,8 @@
 function loadUiModule() {
+  const KIRBY_FADE_DURATION_MS = 800;
   const hoverRevealBoundCards = new WeakSet();
   const hoverRevealTimers = new WeakMap();
+  const kirbyFadeTimers = new WeakMap();
 
   /**
    * 为UP主创建屏蔽按钮，显示在视频卡片上。
@@ -102,7 +104,6 @@ function loadUiModule() {
     if (blockCountDisplayElement) {
       blockCountDisplayElement.textContent = `${blockedVideoCards.size}`;
     }
-    countBlockInfo;
     if (blockCountTitleElement) {
       blockCountTitleElement.textContent = `已屏蔽视频 (${blockedVideoCards.size} = ${countBlockInfo} + ${countBlockAD} + ${countBlockCM} + ${countBlockTName})`;
     }
@@ -386,7 +387,6 @@ function loadUiModule() {
     const tempToggleContainer = document.createElement("div");
     tempToggleContainer.style.display = "flex";
     tempToggleContainer.style.alignItems = "center";
-    tempToggleContainer.style.marginBottom = "8px";
     tempToggleContainer.style.gap = "8px";
     tempToggleContainer.style.margin = "20px 0";
 
@@ -816,9 +816,7 @@ function loadUiModule() {
           top: 0;
           left: 0;
           width: 100%;
-          height: 20px;
-          margin-top: 5px;
-          padding: 0 5px;
+          padding: 2px;
           font-size: 12px;
           flex-direction: row;
           justify-content: space-between;
@@ -847,26 +845,36 @@ function loadUiModule() {
         align-items: flex-end;
         bottom: 0;
       }
-      .card-box .bilibili-blacklist-tname-group .bilibili-blacklist-tname
-      {
-        background-color:rgba(255, 255, 255, 0.87);
-        color: #9499A0;
-        border: 1px solid #9499A0;
+      /* btn / reason / tname 共用基础外观 */
+      .bilibili-blacklist-block-btn,
+      .bilibili-blacklist-block-reason,
+      .bilibili-blacklist-tname {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 20px;
+          padding: 0 6px;
+          box-sizing: border-box;
+          font-size: 12px;
+          line-height: 1;
+          color: white;
+          text-align: center;
+          white-space: nowrap;
+          border: none;
+          border-radius: 2px;
       }
 
       .bilibili-blacklist-block-btn {
           position: static;
-          display: flex;
           width: 40px;
-          height: 20px;
-          justify-content: center;
-          align-items: center;
           pointer-events: auto !important;
           background-color: #fb7299dd;
-          color: white;
-          border-radius: 10%;
           cursor: pointer;
-          text-align: center;
+      }
+
+      .bilibili-blacklist-block-reason {
+          background-color: #f56c6c;
+          pointer-events: none;
       }
 
       .bilibili-blacklist-tname-group {
@@ -882,21 +890,11 @@ function loadUiModule() {
 
       .bilibili-blacklist-tname {
           background-color: #fb7299dd;
-          color: white;
-          height: 20px;
-          padding: 0 5px;
-          border-radius: 10%;
-          cursor: pointer;
-          border-radius: 2px;
-          pointer-events: auto;
-          text-align: center;
-          display: flex;
-          justify-content: center;
-          align-items: center;
           text-overflow: ellipsis;
           overflow: hidden;
-          white-space: nowrap;
-        }
+          pointer-events: auto;
+          cursor: pointer;
+      }
 
 
         /* 修复视频卡片布局 */
@@ -910,7 +908,9 @@ function loadUiModule() {
             background-color:var(--bg1,#fff);
             opacity: 0.85;
         }
-        #bilibili-blacklist-manager-panel h4,h3 {
+        #bilibili-blacklist-manager-panel h4,
+        #bilibili-blacklist-manager-panel h3,
+        #bilibili-blacklist-manager-panel button {
              color:var(--text2,#000);
         }
         /* 按钮悬停效果 */
@@ -928,13 +928,18 @@ function loadUiModule() {
             transition: transform 0.2s;
         }
         /* 输入框聚焦效果 */
-        #"bilibili-blacklist-manager-panel input:focus {
+        #bilibili-blacklist-manager-panel input:focus {
             outline: none;
             border-color: #fb7299 !important;
         }
         /*灰度效果*/
         .bilibili-blacklist-grayscale {
            filter: grayscale(95%);
+        }
+        /* 卡比覆盖层：圆角与悬停显示的渐变动画 */
+        #bilibili-blacklist-kirby {
+            border-radius: 6px;
+            transition: opacity ${KIRBY_FADE_DURATION_MS / 1000}s ease;
         }
     `);
 
@@ -966,13 +971,63 @@ function loadUiModule() {
   }
 
   /**
+   * 渐显卡比覆盖层（鼠标移开后恢复遮挡）。
+   * @param {HTMLElement} overlay - 卡比覆盖层元素。
+   */
+  function fadeInKirbyOverlay(overlay) {
+    if (!overlay) return;
+    const pendingTimer = kirbyFadeTimers.get(overlay);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      kirbyFadeTimers.delete(overlay);
+    }
+    overlay.style.display = "flex";
+    overlay.style.opacity = "0";
+    void overlay.offsetHeight; // 强制重排以触发过渡动画
+    overlay.style.opacity = "1";
+  }
+
+  /**
+   * 渐隐卡比覆盖层（悬停临时显示视频）。
+   * @param {HTMLElement} overlay - 卡比覆盖层元素。
+   */
+  function fadeOutKirbyOverlay(overlay) {
+    if (!overlay) return;
+    const pendingTimer = kirbyFadeTimers.get(overlay);
+    if (pendingTimer) clearTimeout(pendingTimer);
+    overlay.style.opacity = "0";
+    kirbyFadeTimers.set(
+      overlay,
+      setTimeout(() => {
+        kirbyFadeTimers.delete(overlay);
+        if (overlay.isConnected && overlay.style.opacity === "0") {
+          overlay.style.display = "none";
+        }
+      }, KIRBY_FADE_DURATION_MS)
+    );
+  }
+
+  /**
+   * 取消卡比覆盖层的渐隐/渐显计时器。
+   * @param {HTMLElement} overlay - 卡比覆盖层元素。
+   */
+  function cancelKirbyFade(overlay) {
+    if (!overlay) return;
+    const pendingTimer = kirbyFadeTimers.get(overlay);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      kirbyFadeTimers.delete(overlay);
+    }
+  }
+
+  /**
    * 恢复所有被悬停临时显示的视频遮罩。
    */
   function restoreAllBlockedVideoOverlays() {
     if (isShowAllVideos) return;
     blockedVideoCards.forEach((card) => {
       const overlay = card.querySelector("#bilibili-blacklist-kirby");
-      if (overlay) overlay.style.display = "flex";
+      if (overlay) fadeInKirbyOverlay(overlay);
     });
   }
 
@@ -994,6 +1049,12 @@ function loadUiModule() {
         return;
       }
 
+      const overlayOnEnter = cardElement.querySelector(
+        "#bilibili-blacklist-kirby"
+      );
+      // 若正在渐隐，先取消，避免悬停期间遮罩消失
+      cancelKirbyFade(overlayOnEnter);
+
       const existingTimer = hoverRevealTimers.get(cardElement);
       if (existingTimer) clearTimeout(existingTimer);
 
@@ -1009,7 +1070,7 @@ function loadUiModule() {
           "#bilibili-blacklist-kirby"
         );
         if (overlay && blockedVideoCards.has(realCard)) {
-          overlay.style.display = "none";
+          fadeOutKirbyOverlay(overlay);
         }
       }, delaySeconds * 1000);
       hoverRevealTimers.set(cardElement, timer);
@@ -1028,7 +1089,7 @@ function loadUiModule() {
         overlay &&
         blockedVideoCards.has(getRealVideoCardElement(cardElement))
       ) {
-        overlay.style.display = "flex";
+        fadeInKirbyOverlay(overlay);
       }
     });
   }
@@ -1061,7 +1122,6 @@ function loadUiModule() {
       backgroundColor: "rgba(255, 255, 255, 0.7)",
       backdropFilter: "blur(5px)",
       WebkitBackdropFilter: "blur(5px)", // 兼容性
-      borderRadius: "inherit",
       border: "1px solid rgba(255, 255, 255, 0.5)",
     });
 

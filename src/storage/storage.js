@@ -32,7 +32,7 @@ function loadStorageModule() {
     blockScanInterval: 200, // BlockCard扫描新卡片的间隔时间（毫秒）
     flagHideOnLoad: true, // 启用/禁用页面加载时自动隐藏
     flagVertical: true, // 启用/禁用屏蔽竖屏视频
-    verticalScaleThreshold: 0.7 || 0.7, // 竖屏视频的宽高比阈值（0-1）
+    verticalScaleThreshold: 0.7, // 竖屏视频的宽高比阈值（0-1）
   };
   let globalPluginConfig = {
     ...defaultGlobalPluginConfig,

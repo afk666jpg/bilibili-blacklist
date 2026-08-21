@@ -36,14 +36,10 @@ function loadPagesModule() {
   }
   let isfirstLoad = true;
   // 监听DOMContentLoaded并检查readyState以进行早期初始化
+  // initializeScript 内部已通过 isfirstLoad 保证只执行一次
   document.addEventListener("DOMContentLoaded", initializeScript);
-  if (document.readyState === "complete"&& isfirstLoad) {
+  if (document.readyState === "complete" && isfirstLoad) {
       initializeScript();
-      isfirstLoad = false;
-  }
-  if (document.readyState === "interactive" && isfirstLoad) {
-      initializeScript();
-      isfirstLoad = false;
   }
 
   /**

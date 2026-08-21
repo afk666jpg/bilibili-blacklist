@@ -18,7 +18,6 @@ function loadCoreModule() {
   let videoCardProcessQueue = new Set(); // 存储待处理的卡片，用于统一的队列处理
   let isVideoCardQueueProcessing = false; // 是否正在处理队列
   let isPageCurrentlyActive = true; // 页面是否可见
-  let observerRetryCount = 0; // 观察器重试计数
   let countBlockInfo = 0; // 已屏蔽视频计数
   let countBlockAD = 0; // 已屏蔽广告计数
   let countBlockTName = 0; // 已屏蔽标签名计数
@@ -37,6 +36,15 @@ function loadCoreModule() {
     ".bili-video-card__title", // 分类页面 -> span title
     ".title", // 视频播放页
   ];
+
+  // 屏蔽类型对应的原因文案
+  const BLOCK_REASON_MAP = {
+    info: "标题/UP主名",
+    ad: "广告",
+    tname: "分类标签",
+    cm: "软广",
+    vertical: "竖屏视频",
+  };
 
   /**
    * 为视频卡片添加屏蔽按钮容器。
@@ -71,23 +79,22 @@ function loadCoreModule() {
   /**
    * 隐藏给定的视频卡片。
    * @param {HTMLElement} cardElement - 要隐藏的视频卡片元素。
-   * @param {string} type - 隐藏类型，默认为"info"。
+   * @param {string} type - 隐藏类型，默认为"none"。
    * @returns {void}
    *
    */
   function hideVideoCard(cardElement, type = "none") {
     const realCardToBlock = getRealVideoCardElement(cardElement);
-    if (!blockedVideoCards.has(realCardToBlock)) {
-      blockedVideoCards.add(realCardToBlock);
-    } else {
-      return;
-    }
     if (!realCardToBlock) {
       console.warn(
         "[bililili-blacklist] hideVideoCard: realCardToBlock is null"
       );
       return;
     }
+    if (blockedVideoCards.has(realCardToBlock)) {
+      return;
+    }
+    blockedVideoCards.add(realCardToBlock);
     if (type === "info") {
       countBlockInfo++;
     }
@@ -103,12 +110,61 @@ function loadCoreModule() {
     if (type === "vertical") {
       countBlockTName++;
     }
-    //console.log(type);
 
     if (globalPluginConfig.flagKirby) {
       addKirbyOverlayToCard(cardElement);
     } else {
       realCardToBlock.style.display = "none";
+    }
+
+    setBlockReasonOnCard(cardElement, type);
+  }
+
+  /**
+   * 在卡片的屏蔽按钮容器中设置屏蔽原因。
+   * @param {HTMLElement} cardElement - 视频卡片元素。
+   * @param {string} type - 屏蔽类型。
+   */
+  function setBlockReasonOnCard(cardElement, type) {
+    const reasonText = BLOCK_REASON_MAP[type];
+    if (!reasonText) return;
+    const container = cardElement.querySelector(
+      ".bilibili-blacklist-block-container"
+    );
+    if (!container) return;
+    let reasonElement = container.querySelector(
+      ".bilibili-blacklist-block-reason"
+    );
+    if (!reasonElement) {
+      reasonElement = document.createElement("span");
+      reasonElement.className = "bilibili-blacklist-block-reason";
+      // 位于"屏蔽"按钮之后、标签组之前
+      const tnameGroup = container.querySelector(
+        ".bilibili-blacklist-tname-group"
+      );
+      if (tnameGroup) {
+        container.insertBefore(reasonElement, tnameGroup);
+      } else {
+        container.appendChild(reasonElement);
+      }
+    }
+    reasonElement.textContent = `屏蔽原因: ${reasonText}`;
+  }
+
+  /**
+   * 移除卡片上的屏蔽原因显示。
+   * @param {HTMLElement} cardElement - 视频卡片元素。
+   */
+  function removeBlockReason(cardElement) {
+    const container = cardElement.querySelector(
+      ".bilibili-blacklist-block-container"
+    );
+    if (!container) return;
+    const reasonElement = container.querySelector(
+      ".bilibili-blacklist-block-reason"
+    );
+    if (reasonElement) {
+      reasonElement.remove();
     }
   }
 
@@ -251,7 +307,11 @@ function loadCoreModule() {
       if (globalPluginConfig.flagKirby) {
         const kirbyOverlay = card.querySelector("#bilibili-blacklist-kirby");
         if (kirbyOverlay) {
-          kirbyOverlay.style.display = isShowAllVideos ? "none" : "flex";
+          if (isShowAllVideos) {
+            kirbyOverlay.style.display = "none";
+          } else {
+            fadeInKirbyOverlay(kirbyOverlay);
+          }
         }
         card.style.display = "block";
       } else {
@@ -309,14 +369,13 @@ function loadCoreModule() {
     }
 
     // 检查正则匹配黑名单
-    if (
-      regexMatchBlacklist.some((regex) => new RegExp(regex, "i").test(upName))
-    ) {
+    const regexList = regexMatchBlacklist.map(
+      (regex) => new RegExp(regex, "i")
+    );
+    if (regexList.some((regex) => regex.test(upName))) {
       return true;
     }
-    if (
-      regexMatchBlacklist.some((regex) => new RegExp(regex, "i").test(title))
-    ) {
+    if (regexList.some((regex) => regex.test(title))) {
       return true;
     }
     return false;
@@ -335,7 +394,7 @@ function loadCoreModule() {
         saveBlacklistsToStorage();
         refreshAllPanelTabs();
         if (cardElement) {
-          hideVideoCard(cardElement);
+          hideVideoCard(cardElement, "info");
         }
         hideAllCardsByUpName(upName);
       }
@@ -376,7 +435,7 @@ function loadCoreModule() {
         saveBlacklistsToStorage();
         refreshAllPanelTabs();
         if (cardElement) {
-          hideVideoCard(cardElement);
+          hideVideoCard(cardElement, "tname");
         }
         hideAllCardsByTagName(tagName);
       }
