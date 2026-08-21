@@ -1969,10 +1969,10 @@
       justifyContent: `${justifyContent}`,
       alignItems: `${alignItems}`,
       zIndex: "10",
-      backgroundColor: "rgba(255, 255, 255, 0.7)",
-      backdropFilter: "blur(5px)",
-      WebkitBackdropFilter: "blur(5px)", // 兼容性
-      border: "1px solid rgba(255, 255, 255, 0.5)",
+      //backgroundColor: 'var(--bg1,#fffe)',
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)", // 兼容性
+      //border: "1px solid rgba(255, 255, 255, 0.5)",
     });
 
     const svg = kirbyWrapper.querySelector("svg");
@@ -2188,7 +2188,7 @@
       scanAndBlockVideoCards();
       blockVideoPageAds();
       console.log("[bilibili-blacklist] 视频播放页屏蔽功能已启动。");
-    }, 5000); // 5000 毫秒 = 5 秒
+    }, 1000); // 5000 毫秒 = 5 秒
   }
 
 

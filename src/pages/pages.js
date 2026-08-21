@@ -96,7 +96,7 @@ function loadPagesModule() {
       scanAndBlockVideoCards();
       blockVideoPageAds();
       console.log("[bilibili-blacklist] 视频播放页屏蔽功能已启动。");
-    }, 5000); // 5000 毫秒 = 5 秒
+    }, 1000); // 5000 毫秒 = 5 秒
   }
 
 
