@@ -251,7 +251,7 @@ function loadCoreModule() {
       if (globalPluginConfig.flagKirby) {
         const kirbyOverlay = card.querySelector("#bilibili-blacklist-kirby");
         if (kirbyOverlay) {
-          kirbyOverlay.style.display = isShowAllVideos ? "none" : "block";
+          kirbyOverlay.style.display = isShowAllVideos ? "none" : "flex";
         }
         card.style.display = "block";
       } else {

@@ -19,19 +19,35 @@ function loadStorageModule() {
   // 默认标签名黑名单
   let tagNameBlacklist = GM_getValue("tNameBlacklist", []);
 
-  // 从存储中获取全局配置
-  let globalPluginConfig = GM_getValue("globalConfig", {
+  // 从存储中获取全局配置，并为旧版本配置补充新增字段
+  const defaultGlobalPluginConfig = {
     flagInfo: true, // 启用/禁用按UP主名/标题屏蔽
     flagAD: true, // 启用/禁用屏蔽一般广告
     flagTName: true, // 启用/禁用按标签名屏蔽（需要API调用）
     flagCM: true, // 启用/禁用屏蔽cm.bilibili.com软广
     flagKirby: true, // 启用/禁用被屏蔽视频的卡比覆盖模式
+    flagHoverReveal: false, // 启用/禁用悬停后临时显示被遮挡视频
+    hoverRevealDelaySeconds: 1, // 悬停显示延迟（秒）
     processQueueInterval: 200, // 处理队列中单个卡片的延迟时间（毫秒）
     blockScanInterval: 200, // BlockCard扫描新卡片的间隔时间（毫秒）
     flagHideOnLoad: true, // 启用/禁用页面加载时自动隐藏
     flagVertical: true, // 启用/禁用屏蔽竖屏视频
     verticalScaleThreshold: 0.7 || 0.7, // 竖屏视频的宽高比阈值（0-1）
-  });
+  };
+  let globalPluginConfig = {
+    ...defaultGlobalPluginConfig,
+    ...(GM_getValue("globalConfig", {}) || {}),
+  };
+
+  // 防止旧配置或手动修改写入超出允许范围的悬停延迟
+  const storedHoverRevealDelay = Number(
+    globalPluginConfig.hoverRevealDelaySeconds
+  );
+  globalPluginConfig.hoverRevealDelaySeconds = Number.isFinite(
+    storedHoverRevealDelay
+  )
+    ? Math.min(5, Math.max(0.1, storedHoverRevealDelay))
+    : defaultGlobalPluginConfig.hoverRevealDelaySeconds;
 
   // 将黑名单保存到存储中
   function saveBlacklistsToStorage() {

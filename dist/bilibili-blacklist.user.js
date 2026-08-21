@@ -48,19 +48,35 @@
   // 默认标签名黑名单
   let tagNameBlacklist = GM_getValue("tNameBlacklist", []);
 
-  // 从存储中获取全局配置
-  let globalPluginConfig = GM_getValue("globalConfig", {
+  // 从存储中获取全局配置，并为旧版本配置补充新增字段
+  const defaultGlobalPluginConfig = {
     flagInfo: true, // 启用/禁用按UP主名/标题屏蔽
     flagAD: true, // 启用/禁用屏蔽一般广告
     flagTName: true, // 启用/禁用按标签名屏蔽（需要API调用）
     flagCM: true, // 启用/禁用屏蔽cm.bilibili.com软广
     flagKirby: true, // 启用/禁用被屏蔽视频的卡比覆盖模式
+    flagHoverReveal: false, // 启用/禁用悬停后临时显示被遮挡视频
+    hoverRevealDelaySeconds: 1, // 悬停显示延迟（秒）
     processQueueInterval: 200, // 处理队列中单个卡片的延迟时间（毫秒）
     blockScanInterval: 200, // BlockCard扫描新卡片的间隔时间（毫秒）
     flagHideOnLoad: true, // 启用/禁用页面加载时自动隐藏
     flagVertical: true, // 启用/禁用屏蔽竖屏视频
     verticalScaleThreshold: 0.7 || 0.7, // 竖屏视频的宽高比阈值（0-1）
-  });
+  };
+  let globalPluginConfig = {
+    ...defaultGlobalPluginConfig,
+    ...(GM_getValue("globalConfig", {}) || {}),
+  };
+
+  // 防止旧配置或手动修改写入超出允许范围的悬停延迟
+  const storedHoverRevealDelay = Number(
+    globalPluginConfig.hoverRevealDelaySeconds
+  );
+  globalPluginConfig.hoverRevealDelaySeconds = Number.isFinite(
+    storedHoverRevealDelay
+  )
+    ? Math.min(5, Math.max(0.1, storedHoverRevealDelay))
+    : defaultGlobalPluginConfig.hoverRevealDelaySeconds;
 
   // 将黑名单保存到存储中
   function saveBlacklistsToStorage() {
@@ -350,7 +366,7 @@
       if (globalPluginConfig.flagKirby) {
         const kirbyOverlay = card.querySelector("#bilibili-blacklist-kirby");
         if (kirbyOverlay) {
-          kirbyOverlay.style.display = isShowAllVideos ? "none" : "block";
+          kirbyOverlay.style.display = isShowAllVideos ? "none" : "flex";
         }
         card.style.display = "block";
       } else {
@@ -774,6 +790,9 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  const hoverRevealBoundCards = new WeakSet();
+  const hoverRevealTimers = new WeakMap();
+
   /**
    * 为UP主创建屏蔽按钮，显示在视频卡片上。
    * @param {string} upName - UP主名称。
@@ -1063,6 +1082,9 @@
       globalPluginConfig[configKey] = !globalPluginConfig[configKey];
       refreshButtonAppearance();
       saveGlobalConfigToStorage();
+      if (configKey === "flagHoverReveal" && !globalPluginConfig[configKey]) {
+        restoreAllBlockedVideoOverlays();
+      }
     });
 
     refreshButtonAppearance(); // 初始化按钮外观
@@ -1073,7 +1095,12 @@
     return container;
   }
   // 辅助函数：为设置创建输入文本
-  function createSettingInput(labelText, configKey, title = null) {
+  function createSettingInput(
+    labelText,
+    configKey,
+    title = null,
+    constraints = {}
+  ) {
     // 卡片扫描间隔设置
     const Container = document.createElement("div");
     Container.style.display = "flex";
@@ -1088,7 +1115,10 @@
 
     const Input = document.createElement("input");
     Input.type = "number";
-    Input.min = "0";
+    const { min = 0, max = null, step = null } = constraints;
+    Input.min = `${min}`;
+    if (max !== null) Input.max = `${max}`;
+    if (step !== null) Input.step = `${step}`;
     Input.value = globalPluginConfig[configKey];
     Input.style.width = "100px";
     Input.style.padding = "6px";
@@ -1105,12 +1135,18 @@
     Button.style.cursor = "pointer";
 
     Button.addEventListener("click", () => {
-      const val = parseFloat(Input.value, 10);
-      if (!isNaN(val) && val >= 0) {
+      const val = Number(Input.value);
+      const isInRange =
+        Input.value.trim() !== "" &&
+        Number.isFinite(val) &&
+        val >= min &&
+        (max === null || val <= max);
+      if (isInRange) {
         globalPluginConfig[configKey] = val;
         saveGlobalConfigToStorage();
       } else {
-        alert("请输入有效的非负数字！");
+        const rangeText = max === null ? `不小于 ${min}` : `${min} 到 ${max}`;
+        alert(`请输入${rangeText}之间的有效数字！`);
       }
     });
     Container.appendChild(Label);
@@ -1250,6 +1286,21 @@
 
     configListElement.appendChild(
       createSettingToggleButton("遮挡被屏蔽视频", "flagKirby", "更加温和的方式")
+    );
+    configListElement.appendChild(
+      createSettingToggleButton(
+        "悬停后显示被遮挡视频",
+        "flagHoverReveal",
+        "鼠标在被遮挡的视频卡片上停留指定时间后临时显示，移开后重新遮挡。仅在“遮挡被屏蔽视频”开启时生效。"
+      )
+    );
+    configListElement.appendChild(
+      createSettingInput(
+        "悬停显示延迟 (秒):",
+        "hoverRevealDelaySeconds",
+        "允许设置 0.1 到 5 秒。",
+        { min: 0.1, max: 5, step: 0.1 }
+      )
     );
     configListElement.appendChild(
       createSettingToggleButton(
@@ -1706,13 +1757,82 @@
   }
 
   /**
+   * 恢复所有被悬停临时显示的视频遮罩。
+   */
+  function restoreAllBlockedVideoOverlays() {
+    if (isShowAllVideos) return;
+    blockedVideoCards.forEach((card) => {
+      const overlay = card.querySelector("#bilibili-blacklist-kirby");
+      if (overlay) overlay.style.display = "flex";
+    });
+  }
+
+  /**
+   * 为被遮挡的视频卡片绑定悬停临时显示行为。
+   * @param {HTMLElement} cardElement - 视频卡片元素。
+   */
+  function bindHoverRevealToCard(cardElement) {
+    if (hoverRevealBoundCards.has(cardElement)) return;
+    hoverRevealBoundCards.add(cardElement);
+
+    cardElement.addEventListener("mouseenter", () => {
+      const realCard = getRealVideoCardElement(cardElement);
+      if (
+        !globalPluginConfig.flagHoverReveal ||
+        isShowAllVideos ||
+        !blockedVideoCards.has(realCard)
+      ) {
+        return;
+      }
+
+      const existingTimer = hoverRevealTimers.get(cardElement);
+      if (existingTimer) clearTimeout(existingTimer);
+
+      const delaySeconds = Math.min(
+        5,
+        Math.max(0.1, Number(globalPluginConfig.hoverRevealDelaySeconds) || 1)
+      );
+      const timer = setTimeout(() => {
+        hoverRevealTimers.delete(cardElement);
+        if (!globalPluginConfig.flagHoverReveal || isShowAllVideos) return;
+
+        const overlay = cardElement.querySelector(
+          "#bilibili-blacklist-kirby"
+        );
+        if (overlay && blockedVideoCards.has(realCard)) {
+          overlay.style.display = "none";
+        }
+      }, delaySeconds * 1000);
+      hoverRevealTimers.set(cardElement, timer);
+    });
+
+    cardElement.addEventListener("mouseleave", () => {
+      const timer = hoverRevealTimers.get(cardElement);
+      if (timer) {
+        clearTimeout(timer);
+        hoverRevealTimers.delete(cardElement);
+      }
+
+      if (isShowAllVideos) return;
+      const overlay = cardElement.querySelector("#bilibili-blacklist-kirby");
+      if (
+        overlay &&
+        blockedVideoCards.has(getRealVideoCardElement(cardElement))
+      ) {
+        overlay.style.display = "flex";
+      }
+    });
+  }
+
+  /**
    * 为视频卡片添加卡比主题的覆盖层。
    * @param {HTMLElement} cardElement - 视频卡片元素。
    */
   function addKirbyOverlayToCard(cardElement) {
-    const kirbyWrapper = document.createElement("div");
+    bindHoverRevealToCard(cardElement);
     // 如果已经有Kirby覆盖层，则不重复添加
     if (cardElement.querySelector("#bilibili-blacklist-kirby") != null) return;
+    const kirbyWrapper = document.createElement("div");
     kirbyWrapper.innerHTML = getKirbySVG();
     kirbyWrapper.id = "bilibili-blacklist-kirby";
 
@@ -1918,7 +2038,7 @@
    * @returns {boolean} 如果是主页则返回true，否则返回false。
    */
   function isCurrentPageMain() {
-    return location.pathname === "/";
+    return location.pathname === "/" || location.pathname === "/index.html";
   }
 
   /**
