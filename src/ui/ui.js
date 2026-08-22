@@ -52,9 +52,12 @@ function loadUiModule() {
     if (!rightEntry) {
       console.warn("[bilibili-blacklist] 未找到右侧导航栏");
       return;
-    } else if (
-      !rightEntry.querySelector("#bilibili-blacklist-manager-button")
-    ) {
+    }
+    // 顶栏由Vue延迟渲染，等li数量超过6个(顶栏基本渲染完成)后再插入按钮，避免被重渲染顶掉
+    if (rightEntry.querySelectorAll("li").length <= 6) {
+      return;
+    }
+    if (!rightEntry.querySelector("#bilibili-blacklist-manager-button")) {
       const listItem = document.createElement("li");
       listItem.id = "bilibili-blacklist-manager-button";
       listItem.style.cursor = "pointer";
@@ -1141,13 +1144,17 @@ function loadUiModule() {
       }
     }
 
-    // 确保卡片有position属性以便子元素绝对定位
-    const cardStyle = getComputedStyle(cardElement);
-    if (cardStyle.position === "static" || !cardStyle.position) {
-      cardElement.style.position = "relative";
+    const hostElement = isCurrentPageCategory()
+      ? cardElement.querySelector(".bili-video-card") || cardElement
+      : cardElement;
+
+    // 确保宿主元素有position属性以便子元素绝对定位
+    const hostStyle = getComputedStyle(hostElement);
+    if (hostStyle.position === "static" || !hostStyle.position) {
+      hostElement.style.position = "relative";
     }
 
-    cardElement.appendChild(kirbyWrapper);
+    hostElement.appendChild(kirbyWrapper);
   }
 
   /**

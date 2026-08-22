@@ -31,6 +31,7 @@ function loadPagesModule() {
       return; // 不支持的页面不进行初始化
     }
     createBlacklistPanel(); // 创建管理面板
+    addBlacklistManagerButton(); // 立即挂载管理按钮，避免在视频页被迟到的顶栏渲染顶掉前不可见；后续由观察器兜底
     console.log("[bilibili-blacklist] 脚本已加载🥔");
     
   }
@@ -95,8 +96,10 @@ function loadPagesModule() {
       // 首次手动扫描和广告屏蔽
       scanAndBlockVideoCards();
       blockVideoPageAds();
+      // 顶栏可能有数秒延迟渲染，若在这之前已超过6个li，手动补挂管理按钮
+      addBlacklistManagerButton();
       console.log("[bilibili-blacklist] 视频播放页屏蔽功能已启动。");
-    }, 1000); // 5000 毫秒 = 5 秒
+    }, 5000); // 5000 毫秒 = 5 秒
   }
 
 

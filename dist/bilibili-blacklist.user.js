@@ -902,9 +902,12 @@
     if (!rightEntry) {
       console.warn("[bilibili-blacklist] 未找到右侧导航栏");
       return;
-    } else if (
-      !rightEntry.querySelector("#bilibili-blacklist-manager-button")
-    ) {
+    }
+    // 顶栏由Vue延迟渲染，等li数量超过6个(顶栏基本渲染完成)后再插入按钮，避免被重渲染顶掉
+    if (rightEntry.querySelectorAll("li").length <= 6) {
+      return;
+    }
+    if (!rightEntry.querySelector("#bilibili-blacklist-manager-button")) {
       const listItem = document.createElement("li");
       listItem.id = "bilibili-blacklist-manager-button";
       listItem.style.cursor = "pointer";
@@ -1991,13 +1994,17 @@
       }
     }
 
-    // 确保卡片有position属性以便子元素绝对定位
-    const cardStyle = getComputedStyle(cardElement);
-    if (cardStyle.position === "static" || !cardStyle.position) {
-      cardElement.style.position = "relative";
+    const hostElement = isCurrentPageCategory()
+      ? cardElement.querySelector(".bili-video-card") || cardElement
+      : cardElement;
+
+    // 确保宿主元素有position属性以便子元素绝对定位
+    const hostStyle = getComputedStyle(hostElement);
+    if (hostStyle.position === "static" || !hostStyle.position) {
+      hostElement.style.position = "relative";
     }
 
-    cardElement.appendChild(kirbyWrapper);
+    hostElement.appendChild(kirbyWrapper);
   }
 
   /**
@@ -2123,6 +2130,7 @@
       return; // 不支持的页面不进行初始化
     }
     createBlacklistPanel(); // 创建管理面板
+    addBlacklistManagerButton(); // 立即挂载管理按钮，避免在视频页被迟到的顶栏渲染顶掉前不可见；后续由观察器兜底
     console.log("[bilibili-blacklist] 脚本已加载🥔");
     
   }
@@ -2187,8 +2195,10 @@
       // 首次手动扫描和广告屏蔽
       scanAndBlockVideoCards();
       blockVideoPageAds();
+      // 顶栏可能有数秒延迟渲染，若在这之前已超过6个li，手动补挂管理按钮
+      addBlacklistManagerButton();
       console.log("[bilibili-blacklist] 视频播放页屏蔽功能已启动。");
-    }, 1000); // 5000 毫秒 = 5 秒
+    }, 5000); // 5000 毫秒 = 5 秒
   }
 
 
