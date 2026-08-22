@@ -166,18 +166,11 @@ function loadPagesModule() {
     }
 
     // 调整UP主名称元素的样式，以便容纳按钮
-    upNameElement.style.display = "inline-flex";
-    upNameElement.style.alignItems = "center";
+    upNameElement.classList.add("bilibili-blacklist-up-block-btn-host");
 
     const button = document.createElement("button");
     button.className = "bilibili-blacklist-up-block-btn";
     button.textContent = "屏蔽";
-    button.style.color = "#fff";
-    button.style.width = "100px";
-    button.style.height = "30px";
-    button.style.marginLeft = "10px";
-    button.style.borderRadius = "5px";
-    button.style.border = "1px solid #fb7299";
 
     // 刷新按钮状态和页面灰度效果
     const refreshButtonStatus = () => {
