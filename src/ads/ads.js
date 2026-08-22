@@ -30,6 +30,7 @@ function loadAdsModule() {
       ".ad-floor-exp", // 广告地板
       ".btn-ad", // 广告按钮
       ".video-page-operator-card-small", // 运营推广
+      ".ad-report",//广告
     ];
 
     adSelectors.forEach((selector) => {

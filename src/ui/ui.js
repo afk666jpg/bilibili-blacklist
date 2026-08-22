@@ -327,6 +327,40 @@ function loadUiModule() {
 
     return Container;
   }
+
+  // 辅助函数：为设置创建下拉选择框
+  function createSettingSelect(labelText, configKey, title = null, options = []) {
+    const container = document.createElement("div");
+    container.className =
+      "bilibili-blacklist-panel-row bilibili-blacklist-setting-select-row";
+    container.title = title;
+
+    const label = document.createElement("span");
+    label.textContent = labelText;
+
+    const select = document.createElement("select");
+    select.className = "bilibili-blacklist-select";
+    select.addEventListener("change", () => {
+      globalPluginConfig[configKey] = select.value;
+      saveGlobalConfigToStorage();
+    });
+
+    // 按当前配置值选中对应项
+    options.forEach((opt) => {
+      const option = document.createElement("option");
+      option.value = opt.value;
+      option.textContent = opt.label;
+      if (String(globalPluginConfig[configKey]) === String(opt.value)) {
+        option.selected = true;
+      }
+      select.appendChild(option);
+    });
+
+    container.appendChild(label);
+    container.appendChild(select);
+    return container;
+  }
+
   /**
    * 刷新面板中的配置设置显示。
    */
@@ -430,6 +464,20 @@ function loadUiModule() {
         "屏蔽主页视频软广",
         "flagCM",
         "cm.bilibili.com软广"
+      )
+    );
+
+    // 自动连播遇到被屏蔽视频的处理方式
+    configListElement.appendChild(
+      createSettingSelect(
+        "自动连播遇到被屏蔽视频:",
+        "flagSkipBlockedAutoplay",
+        "播放页开启自动连播并播到被屏蔽视频时：切换为未屏蔽视频 / 停止播放 / 不处理（按B站默认继续播放）。",
+        [
+          { value: "skip", label: "切换为未屏蔽视频" },
+          { value: "stop", label: "停止播放" },
+          { value: "off", label: "不处理(默认)" },
+        ]
       )
     );
 
@@ -839,6 +887,20 @@ function loadUiModule() {
       padding: 8px;
       border: 1px solid #ddd;
       border-radius: 4px;
+    }
+
+    #bilibili-blacklist-manager-panel select {
+      flex: 1;
+      min-width: 120px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      color: var(--text2, #000);
+      background-color: var(--bg1, #fff);
+    }
+
+    .bilibili-blacklist-setting-select-row {
+      margin-bottom: 8px;
     }
 
     /* 面板结构 */

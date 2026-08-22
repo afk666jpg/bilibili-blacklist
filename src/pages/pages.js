@@ -36,6 +36,7 @@ function loadPagesModule() {
     
   }
   let isfirstLoad = true;
+  let rescanVideoPageTimer = null; // 视频页定时补充扫描定时器
   // 监听DOMContentLoaded并检查readyState以进行早期初始化
   // initializeScript 内部已通过 isfirstLoad 保证只执行一次
   document.addEventListener("DOMContentLoaded", initializeScript);
@@ -96,6 +97,13 @@ function loadPagesModule() {
       // 首次手动扫描和广告屏蔽
       scanAndBlockVideoCards();
       blockVideoPageAds();
+      // 自动连播遇到被屏蔽视频时的处理（停止/切换/不处理，由用户配置）
+      initAutoplaySkip();
+      // 视频页在页面内切集后，右侧推荐会原地重建；观察器可能绑定到已替换的节点，
+      // 这里定时补充扫描，确保新加载的卡片也能被处理（scanAndBlockVideoCards 内部有节流与去重）。
+      rescanVideoPageTimer = setInterval(() => {
+        scanAndBlockVideoCards();
+      }, 2500);
       // 顶栏可能有数秒延迟渲染，若在这之前已超过6个li，手动补挂管理按钮
       addBlacklistManagerButton();
       console.log("[bilibili-blacklist] 视频播放页屏蔽功能已启动。");

@@ -28,6 +28,9 @@ function loadCoreModule() {
     ".bili-video-card__info--author", // 主页
     ".bili-video-card__author", // 分类页面 -> span title
     ".name", // 视频播放页
+    ".upname a span", // 视频播放页“接下来播放/相关推荐”卡片（新版结构）
+    ".upname a",
+    ".upname",
   ];
 
   // 用于不同页面视频标题选择器
@@ -61,11 +64,21 @@ function loadCoreModule() {
         const blockButton = createBlockUpButton(upName, cardElement);
         if (isCurrentPageVideo()) {
           // 视频播放页面的视频卡片结构特殊，需要调整位置
-          cardElement.querySelector(".card-box").style.position = "relative";
-          cardElement.querySelector(".card-box").appendChild(container);
+          const cardBox = cardElement.querySelector(".card-box");
+          if (cardBox) {
+            cardBox.style.position = "relative";
+            cardBox.appendChild(container);
+          } else {
+            cardElement.appendChild(container);
+          }
         } else if (isCurrentPageCategory()) {
           // 分类页面的视频卡片结构特殊，需要调整位置
-          cardElement.querySelector(".bili-video-card").appendChild(container);
+          const biliVideoCard = cardElement.querySelector(".bili-video-card");
+          if (biliVideoCard) {
+            biliVideoCard.appendChild(container);
+          } else {
+            cardElement.appendChild(container);
+          }
         } else {
           cardElement.appendChild(container);
         }

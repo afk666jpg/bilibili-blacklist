@@ -23,6 +23,7 @@ const moduleOrder = [
   'pages/pages.js',
   'ads/ads.js',
   'utils/utils.js',
+  'autoplay/autoplay.js',
   'main.js' // 主文件放在最后，包含初始化代码
 ];
 
