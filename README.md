@@ -55,9 +55,9 @@
 - `src/utils/utils.js` - 工具函数模块
 - `src/main.js` - 主入口文件
 
-### 构建方法
+### 构建方法（发布用）
 
-1. 安装Node.js
+1. 安装 Node.js
 2. 在项目根目录运行以下命令生成最终脚本：
 
 ```bash
@@ -71,6 +71,59 @@ node build.js
 ```
 
 构建后的脚本位于 `dist/bilibili-blacklist.user.js`
+
+### 开发工作流（推荐）
+
+一条命令即可完成「构建 + 监听 + 本地服务器」，改完代码**刷新页面**立即生效，无需再改 `?t=` 参数、也无需重新安装脚本。
+
+#### 涉及文件
+
+| 文件 | 作用 |
+| ---- | ---- |
+| `scripts/dev.js` | 一键开发脚本：首次构建 → 监听 `src/` 变化自动重建 → 本地静态服务器（no-cache + CORS），零依赖 |
+| `test/bilibili-blacklist.dev.user.js` | 油猴加载器，**只需安装一次**，之后永远不用修改 |
+| `test/s.bat` | Windows 下双击即可启动开发环境 |
+
+#### 1️⃣ 一次性安装加载器
+
+- 打开 `test/bilibili-blacklist.dev.user.js`，按油猴提示安装；
+- 或先启动服务器后，在浏览器访问 `http://localhost:5173/test/bilibili-blacklist.dev.user.js` 安装。
+
+安装后请**禁用旧的 "Bilibili-BlackList -Dev" 脚本**，避免重复运行。
+
+#### 2️⃣ 启动开发环境（三选一）
+
+```bash
+npm run dev
+```
+
+```bash
+node scripts/dev.js
+```
+
+或双击 `test\s.bat`（Windows）。
+
+启动后会自动完成：
+1. 构建产物到 `dist/bilibili-blacklist.user.js`；
+2. 监听 `src/` 目录，代码变更后自动重新构建（防抖 150ms）；
+3. 在 `http://localhost:5173` 启动静态服务器（`no-cache` + CORS）。
+
+#### 3️⃣ 开始开发
+
+修改 `src/` 下的代码并保存 → 控制台提示"构建完成" → **刷新 B 站页面**即可看到最新效果。
+
+#### 工作原理
+
+油猴对 `@require` 是按 URL 缓存资源的，旧方式每次都要改 `?t=` 强制重新下载。
+新方式改为**加载器**：加载器脚本本身从不变化，每次打开页面时通过 `GM_xmlhttpRequest` 实时拉取 `localhost:5173/dist/bilibili-blacklist.user.js?t=<时间戳>` 并执行，因此只需安装一次；本地服务器返回 `no-cache` 头 + 加载器带时间戳查询参数，双重保险。
+
+#### 常见问题排查
+
+- **控制台报"无法连接本地 dev server"**：dev server 未启动或端口被占用，请先运行 `npm run dev`。
+- **控制台报"拉取构建产物失败，HTTP 404"**：确认 dev server 工作目录为项目根目录（存在 `dist/`）。
+- **改代码后刷新页面没有变化**：确认终端已出现"构建完成"提示；没有则说明 `src/` 未被监听（请确认在项目根目录启动）。
+- **页面出现两个盾牌图标 / 功能双份执行**：旧的 "Bilibili-BlackList -Dev" 脚本未禁用。
+- **首次安装后控制台有跨域请求提示**：油猴弹出允许请求 `localhost` 的确认时选择「始终允许」即可（加载器已声明 `@connect localhost` / `127.0.0.1`）。
 
 ---
 

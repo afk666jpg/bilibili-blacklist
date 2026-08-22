@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili-BlackList
 // @namespace    https://github.com/HeavenTTT/bilibili-blacklist
-// @version      1.2.3
+// @version      1.2.4
 // @author       HeavenTTT
 // @description  Bilibili UP屏蔽插件 - 屏蔽UP主视频卡片，支持精确匹配和正则匹配，支持视频页面、分类页面、搜索页面等。
 // @match        *://*.bilibili.com/*
@@ -1952,7 +1952,7 @@
 
     #bilibili-blacklist-kirby.bilibili-blacklist-kirby-video {
       justify-content: flex-start;
-      align-items: flex-start;
+      
     }
 
     #bilibili-blacklist-kirby svg {
@@ -2155,7 +2155,7 @@
     const svg = kirbyWrapper.querySelector("svg");
     if (svg) {
       const cardRect = cardElement.getBoundingClientRect();
-      const size = Math.min(cardRect.width, cardRect.height) * 1.0;
+      const size = Math.min(cardRect.width, cardRect.height) * 0.8;
       svg.setAttribute("width", `${size}px`);
       svg.setAttribute("height", `${size}px`);
     }

@@ -1079,7 +1079,7 @@ function loadUiModule() {
 
     #bilibili-blacklist-kirby.bilibili-blacklist-kirby-video {
       justify-content: flex-start;
-      align-items: flex-start;
+      
     }
 
     #bilibili-blacklist-kirby svg {
@@ -1282,7 +1282,7 @@ function loadUiModule() {
     const svg = kirbyWrapper.querySelector("svg");
     if (svg) {
       const cardRect = cardElement.getBoundingClientRect();
-      const size = Math.min(cardRect.width, cardRect.height) * 1.0;
+      const size = Math.min(cardRect.width, cardRect.height) * 0.8;
       svg.setAttribute("width", `${size}px`);
       svg.setAttribute("height", `${size}px`);
     }

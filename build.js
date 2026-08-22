@@ -3,6 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 
+// 版本唯一来源：package.json
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+const VERSION = pkg.version;
+
 // 定义源文件路径
 const srcDir = path.join(__dirname, 'src');
 const outputDir = path.join(__dirname, 'dist');
@@ -34,7 +38,7 @@ let outputContent = '';
 outputContent += '// ==UserScript==\n';
 outputContent += '// @name         Bilibili-BlackList\n';
 outputContent += '// @namespace    https://github.com/HeavenTTT/bilibili-blacklist\n';
-outputContent += '// @version      1.2.3\n';
+outputContent += `// @version      ${VERSION}\n`;
 outputContent += '// @author       HeavenTTT\n';
 outputContent += '// @description  Bilibili UP屏蔽插件 - 屏蔽UP主视频卡片，支持精确匹配和正则匹配，支持视频页面、分类页面、搜索页面等。\n';
 outputContent += '// @match        *://*.bilibili.com/*\n';
@@ -88,4 +92,5 @@ outputContent += '\n})();\n';
 fs.writeFileSync(outputFile, outputContent);
 
 console.log(`Build completed: ${outputFile}`);
+console.log(`Version: ${VERSION}`);
 console.log(`Total modules processed: ${moduleOrder.length}`);
