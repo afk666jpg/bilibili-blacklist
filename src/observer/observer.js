@@ -57,8 +57,9 @@ function loadObserverModule() {
           blockVideoPageAds(); // 视频页广告屏蔽
         }
         if (!document.getElementById("bilibili-blacklist-manager-button")) {
-          addBlacklistManagerButton(); // 确保管理按钮存在
+         // addBlacklistManagerButton(); // 确保管理按钮存在
         }
+        
       }, globalPluginConfig.blockScanInterval);
     }
   });

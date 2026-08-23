@@ -749,19 +749,22 @@ function loadUiModule() {
     }
 
     .bili-video-card:hover .bilibili-blacklist-block-container,
-    .card-box:hover .bilibili-blacklist-block-container {
+    .card-box:hover .bilibili-blacklist-block-container,
+    .bilibili-blacklist-block-container-host:hover .bilibili-blacklist-block-container {
       display: flex !important;
     }
 
     .card-box .bilibili-blacklist-block-container {
       flex-direction: column;
       align-items: flex-start;
+      justify-content: flex-start;
       height: 100%;
     }
 
     .card-box .bilibili-blacklist-tname-group {
       flex-direction: column;
       align-items: flex-end;
+      margin-top: auto;
     }
 
     /* btn / reason / tname 共用基础外观 */

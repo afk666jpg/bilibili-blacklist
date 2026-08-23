@@ -90,7 +90,8 @@ function loadPagesModule() {
   function initializeVideoPage() {
     // **用户修改 2: 延迟 5 秒启动屏蔽功能**
     console.log("[bilibili-blacklist] 播放页已加载，将延迟 5 秒启动功能。🍇");
-
+    const flag = globalPluginConfig.flagSkipBlockedAutoplay;
+    globalPluginConfig.flagSkipBlockedAutoplay = "off";
     // 延迟 5 秒执行核心功能
     setTimeout(() => {
       initializeObserver("right-container"); // 观察视频播放页右侧推荐区域
@@ -103,11 +104,14 @@ function loadPagesModule() {
       // 这里定时补充扫描，确保新加载的卡片也能被处理（scanAndBlockVideoCards 内部有节流与去重）。
       rescanVideoPageTimer = setInterval(() => {
         scanAndBlockVideoCards();
+        globalPluginConfig.flagSkipBlockedAutoplay= flag; // 第一次打开页面时，无论如何都不做处理
       }, 2500);
       // 顶栏可能有数秒延迟渲染，若在这之前已超过6个li，手动补挂管理按钮
       addBlacklistManagerButton();
+      
       console.log("[bilibili-blacklist] 视频播放页屏蔽功能已启动。");
     }, 5000); // 5000 毫秒 = 5 秒
+    
   }
 
 

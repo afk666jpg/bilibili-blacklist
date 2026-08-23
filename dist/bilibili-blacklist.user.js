@@ -64,7 +64,7 @@
     verticalScaleThreshold: 0.7, // 竖屏视频的宽高比阈值（0-1）
     // 自动连播遇到被屏蔽视频时的处理方式（三态）：
     //  "skip" = 切换到未屏蔽视频；"stop" = 停止播放；"off" = 不处理（B站默认行为，继续播放被屏蔽视频）
-    flagSkipBlockedAutoplay: "skip",
+    flagSkipBlockedAutoplay: "off",
   };
   let globalPluginConfig = {
     ...defaultGlobalPluginConfig,
@@ -175,43 +175,66 @@
   };
 
   /**
+   * 获取视频卡片上容器应挂载的宿主元素，并确保宿主可被绝对定位。
+   * @param {HTMLElement} cardElement - 视频卡片元素。
+   * @returns {HTMLElement} 容器宿主元素。
+   */
+  function getBlockContainerHost(cardElement) {
+    // 视频播放页面的视频卡片结构特殊，需要调整位置
+    if (isCurrentPageVideo()) {
+      const cardBox = cardElement.querySelector(".card-box");
+      if (cardBox) {
+        cardBox.style.position = "relative";
+        cardBox.classList.add("bilibili-blacklist-block-container-host");
+        return cardBox;
+      }
+    } else if (isCurrentPageCategory()) {
+      // 分类页面的视频卡片结构特殊，需要调整位置
+      const biliVideoCard = cardElement.querySelector(".bili-video-card");
+      if (biliVideoCard) {
+        biliVideoCard.classList.add("bilibili-blacklist-block-container-host");
+        return biliVideoCard;
+      }
+    }
+    // 默认宿主：确保可被绝对定位的子元素正常显示
+    const hostStyle = getComputedStyle(cardElement);
+    if (hostStyle.position === "static" || !hostStyle.position) {
+      cardElement.style.position = "relative";
+    }
+    cardElement.classList.add("bilibili-blacklist-block-container-host");
+    return cardElement;
+  }
+
+  /**
+   * 确保视频卡片上存在屏蔽容器，不存在则创建（用于广告等未走扫描流程的卡片）。
+   * @param {HTMLElement} cardElement - 视频卡片元素。
+   * @returns {HTMLElement} 已存在的或新创建的容器元素。
+   */
+  function ensureBlockContainerOnCard(cardElement) {
+    const existing = cardElement.querySelector(
+      ".bilibili-blacklist-block-container"
+    );
+    if (existing) return existing;
+    const container = document.createElement("div");
+    container.classList.add("bilibili-blacklist-block-container");
+    const host = getBlockContainerHost(cardElement);
+    host.appendChild(container);
+    return container;
+  }
+
+  /**
    * 为视频卡片添加屏蔽按钮容器。
    * @param {string} upName - UP主名称。
    * @param {HTMLElement} cardElement - 视频卡片元素。
    * @returns {HTMLElement} 创建的容器元素。
    */
   function addBlockContainerToCard(upName, cardElement) {
-    if (!cardElement.querySelector(".bilibili-blacklist-block-container")) {
-      const container = document.createElement("div");
-      container.classList.add("bilibili-blacklist-block-container");
-
-      if (!cardElement.querySelector(".bilibili-blacklist-block-btn")) {
-        const blockButton = createBlockUpButton(upName, cardElement);
-        if (isCurrentPageVideo()) {
-          // 视频播放页面的视频卡片结构特殊，需要调整位置
-          const cardBox = cardElement.querySelector(".card-box");
-          if (cardBox) {
-            cardBox.style.position = "relative";
-            cardBox.appendChild(container);
-          } else {
-            cardElement.appendChild(container);
-          }
-        } else if (isCurrentPageCategory()) {
-          // 分类页面的视频卡片结构特殊，需要调整位置
-          const biliVideoCard = cardElement.querySelector(".bili-video-card");
-          if (biliVideoCard) {
-            biliVideoCard.appendChild(container);
-          } else {
-            cardElement.appendChild(container);
-          }
-        } else {
-          cardElement.appendChild(container);
-        }
-        container.appendChild(blockButton);
-      }
-      return cardElement.querySelector(".bilibili-blacklist-block-container");
+    const container = ensureBlockContainerOnCard(cardElement);
+    if (!container.querySelector(".bilibili-blacklist-block-btn")) {
+      const blockButton = createBlockUpButton(upName, cardElement);
+      container.appendChild(blockButton);
     }
-    return cardElement.querySelector(".bilibili-blacklist-block-container");
+    return container;
   }
 
   /**
@@ -266,10 +289,8 @@
   function setBlockReasonOnCard(cardElement, type) {
     const reasonText = BLOCK_REASON_MAP[type];
     if (!reasonText) return;
-    const container = cardElement.querySelector(
-      ".bilibili-blacklist-block-container"
-    );
-    if (!container) return;
+    // 广告等卡片未经过 scanAndBlockVideoCards 流程，可能不存在容器，需确保创建
+    const container = ensureBlockContainerOnCard(cardElement);
     let reasonElement = container.querySelector(
       ".bilibili-blacklist-block-reason"
     );
@@ -1622,19 +1643,22 @@
     }
 
     .bili-video-card:hover .bilibili-blacklist-block-container,
-    .card-box:hover .bilibili-blacklist-block-container {
+    .card-box:hover .bilibili-blacklist-block-container,
+    .bilibili-blacklist-block-container-host:hover .bilibili-blacklist-block-container {
       display: flex !important;
     }
 
     .card-box .bilibili-blacklist-block-container {
       flex-direction: column;
       align-items: flex-start;
+      justify-content: flex-start;
       height: 100%;
     }
 
     .card-box .bilibili-blacklist-tname-group {
       flex-direction: column;
       align-items: flex-end;
+      margin-top: auto;
     }
 
     /* btn / reason / tname 共用基础外观 */
@@ -2242,8 +2266,9 @@
           blockVideoPageAds(); // 视频页广告屏蔽
         }
         if (!document.getElementById("bilibili-blacklist-manager-button")) {
-          addBlacklistManagerButton(); // 确保管理按钮存在
+         // addBlacklistManagerButton(); // 确保管理按钮存在
         }
+        
       }, globalPluginConfig.blockScanInterval);
     }
   });
@@ -2355,7 +2380,8 @@
   function initializeVideoPage() {
     // **用户修改 2: 延迟 5 秒启动屏蔽功能**
     console.log("[bilibili-blacklist] 播放页已加载，将延迟 5 秒启动功能。🍇");
-
+    const flag = globalPluginConfig.flagSkipBlockedAutoplay;
+    globalPluginConfig.flagSkipBlockedAutoplay = "off";
     // 延迟 5 秒执行核心功能
     setTimeout(() => {
       initializeObserver("right-container"); // 观察视频播放页右侧推荐区域
@@ -2368,11 +2394,14 @@
       // 这里定时补充扫描，确保新加载的卡片也能被处理（scanAndBlockVideoCards 内部有节流与去重）。
       rescanVideoPageTimer = setInterval(() => {
         scanAndBlockVideoCards();
+        globalPluginConfig.flagSkipBlockedAutoplay= flag; // 第一次打开页面时，无论如何都不做处理
       }, 2500);
       // 顶栏可能有数秒延迟渲染，若在这之前已超过6个li，手动补挂管理按钮
       addBlacklistManagerButton();
+      
       console.log("[bilibili-blacklist] 视频播放页屏蔽功能已启动。");
     }, 5000); // 5000 毫秒 = 5 秒
+    
   }
 
 

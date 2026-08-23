@@ -35,7 +35,7 @@ function loadStorageModule() {
     verticalScaleThreshold: 0.7, // 竖屏视频的宽高比阈值（0-1）
     // 自动连播遇到被屏蔽视频时的处理方式（三态）：
     //  "skip" = 切换到未屏蔽视频；"stop" = 停止播放；"off" = 不处理（B站默认行为，继续播放被屏蔽视频）
-    flagSkipBlockedAutoplay: "skip",
+    flagSkipBlockedAutoplay: "off",
   };
   let globalPluginConfig = {
     ...defaultGlobalPluginConfig,
