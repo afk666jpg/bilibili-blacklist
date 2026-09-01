@@ -1,6 +1,8 @@
 function loadUiModule() {
+  const KIRBY_FADE_DURATION_MS = 800;
   const hoverRevealBoundCards = new WeakSet();
   const hoverRevealTimers = new WeakMap();
+  const kirbyFadeTimers = new WeakMap();
 
   /**
    * 为UP主创建屏蔽按钮，显示在视频卡片上。
@@ -71,25 +73,22 @@ function loadUiModule() {
     if (!rightEntry) {
       console.warn("[bilibili-blacklist] 未找到右侧导航栏");
       return;
-    } else if (
-      !rightEntry.querySelector("#bilibili-blacklist-manager-button")
-    ) {
+    }
+    // 顶栏由Vue延迟渲染，等li数量超过6个(顶栏基本渲染完成)后再插入按钮，避免被重渲染顶掉
+    if (rightEntry.querySelectorAll("li").length <= 6) {
+      return;
+    }
+    if (!rightEntry.querySelector("#bilibili-blacklist-manager-button")) {
       const listItem = document.createElement("li");
       listItem.id = "bilibili-blacklist-manager-button";
-      listItem.style.cursor = "pointer";
       listItem.className = "v-popover-wrap";
 
       const button = document.createElement("div");
       button.className = "right-entry-item";
-      button.style.display = "flex";
-      button.style.flexDirection = "column";
-      button.style.alignItems = "center";
-      button.style.justifyContent = "center";
 
       const icon = document.createElement("div");
       icon.className = "right-entry__outside";
       icon.innerHTML = getKirbySVG(); // 获取卡比SVG图标
-      icon.style.marginBottom = "-5px";
 
       blockCountDisplayElement = document.createElement("span");
       blockCountDisplayElement.textContent = `0`;
@@ -107,11 +106,8 @@ function loadUiModule() {
 
       // 点击按钮显示/隐藏管理面板
       listItem.addEventListener("click", () => {
-        if (managerPanel.style.display === "none") {
-          managerPanel.style.display = "flex";
-        } else {
-          managerPanel.style.display = "none";
-        }
+        managerPanel.style.display =
+          managerPanel.style.display === "flex" ? "none" : "flex";
       });
     }
   }
@@ -123,7 +119,6 @@ function loadUiModule() {
     if (blockCountDisplayElement) {
       blockCountDisplayElement.textContent = `${blockedVideoCards.size}`;
     }
-    countBlockInfo;
     if (blockCountTitleElement) {
       blockCountTitleElement.textContent = `已屏蔽视频 (${blockedVideoCards.size} = ${countBlockInfo} + ${countBlockAD} + ${countBlockCM} + ${countBlockTName} + ${countBlockVideoTag})`;
     }
@@ -132,13 +127,9 @@ function loadUiModule() {
   // 辅助函数：创建通用按钮
   function createPanelButton(text, bgColor, onClick) {
     const button = document.createElement("button");
+    button.className = "bilibili-blacklist-panel-btn";
     button.textContent = text;
-    button.style.padding = "4px 8px";
     button.style.background = bgColor;
-    button.style.color = "#fff";
-    button.style.border = "none";
-    button.style.borderRadius = "4px";
-    button.style.cursor = "pointer";
     button.addEventListener("click", onClick);
     return button;
   }
@@ -146,15 +137,10 @@ function loadUiModule() {
   // 辅助函数：为黑名单面板创建列表项
   function createBlacklistListItem(contentText, onRemoveClick) {
     const item = document.createElement("li");
-    item.style.display = "flex";
-    item.style.justifyContent = "space-between";
-    item.style.alignItems = "center";
-    item.style.padding = "8px 0";
-    item.style.borderBottom = "1px solid #f1f2f3";
+    item.className = "bilibili-blacklist-list-item";
 
     const content = document.createElement("span");
     content.textContent = contentText;
-    content.style.flex = "1";
     const removeBtn = createPanelButton("移除", "#f56c6c", onRemoveClick);
 
     item.appendChild(content);
@@ -192,10 +178,8 @@ function loadUiModule() {
 
     if (exactMatchBlacklist.length === 0) {
       const empty = document.createElement("div");
+      empty.className = "bilibili-blacklist-empty";
       empty.textContent = "暂无精确匹配屏蔽UP主";
-      empty.style.textAlign = "center";
-      empty.style.padding = "16px";
-      empty.style.color = "#999";
       exactMatchListElement.appendChild(empty);
     }
   }
@@ -234,10 +218,8 @@ function loadUiModule() {
 
     if (regexMatchBlacklist.length === 0) {
       const empty = document.createElement("div");
+      empty.className = "bilibili-blacklist-empty";
       empty.textContent = "暂无正则匹配屏蔽规则";
-      empty.style.textAlign = "center";
-      empty.style.padding = "16px";
-      empty.style.color = "#999";
       regexMatchListElement.appendChild(empty);
     }
   }
@@ -273,10 +255,8 @@ function loadUiModule() {
 
     if (tagNameBlacklist.length === 0) {
       const empty = document.createElement("div");
+      empty.className = "bilibili-blacklist-empty";
       empty.textContent = "暂无标签屏蔽规则";
-      empty.style.textAlign = "center";
-      empty.style.padding = "16px";
-      empty.style.color = "#999";
       tagNameListElement.appendChild(empty);
     }
   }
@@ -322,22 +302,15 @@ function loadUiModule() {
   // 辅助函数：为设置创建切换按钮
   function createSettingToggleButton(labelText, configKey, title = null) {
     const container = document.createElement("div");
-    container.style.display = "flex";
-    container.style.alignItems = "center";
-    container.style.marginBottom = "8px";
-    container.style.gap = "8px";
+    container.className =
+      "bilibili-blacklist-panel-row bilibili-blacklist-setting-toggle";
     container.title = title; // 设置鼠标悬停提示
 
     const label = document.createElement("span");
     label.textContent = labelText;
-    label.style.flex = "1";
 
     const button = document.createElement("button");
-    button.style.padding = "6px 12px";
-    button.style.border = "none";
-    button.style.borderRadius = "4px";
-    button.style.cursor = "pointer";
-    button.style.color = "#fff";
+    button.className = "bilibili-blacklist-config-btn";
 
     function refreshButtonAppearance() {
       button.textContent = globalPluginConfig[configKey] ? "开启" : "关闭";
@@ -371,36 +344,26 @@ function loadUiModule() {
   ) {
     // 卡片扫描间隔设置
     const Container = document.createElement("div");
-    Container.style.display = "flex";
-    Container.style.alignItems = "center";
-    Container.style.marginTop = "16px";
-    Container.style.gap = "8px";
+    Container.className =
+      "bilibili-blacklist-panel-row bilibili-blacklist-setting-input-row";
     Container.title = title;
 
     const Label = document.createElement("span");
     Label.textContent = labelText;
-    Label.style.flex = "1";
 
     const Input = document.createElement("input");
     Input.type = "number";
+    Input.className = "bilibili-blacklist-number-input";
     const { min = 0, max = null, step = null } = constraints;
     Input.min = `${min}`;
     if (max !== null) Input.max = `${max}`;
     if (step !== null) Input.step = `${step}`;
     Input.value = globalPluginConfig[configKey];
-    Input.style.width = "100px";
-    Input.style.padding = "6px";
-    Input.style.border = "1px solid #ddd";
-    Input.style.borderRadius = "4px";
 
     const Button = document.createElement("button");
+    Button.className =
+      "bilibili-blacklist-config-btn bilibili-blacklist-config-btn-primary";
     Button.textContent = "保存";
-    Button.style.padding = "6px 12px";
-    Button.style.backgroundColor = "#fb7299";
-    Button.style.color = "#fff";
-    Button.style.border = "none";
-    Button.style.borderRadius = "4px";
-    Button.style.cursor = "pointer";
 
     Button.addEventListener("click", () => {
       const val = Number(Input.value);
@@ -423,6 +386,40 @@ function loadUiModule() {
 
     return Container;
   }
+
+  // 辅助函数：为设置创建下拉选择框
+  function createSettingSelect(labelText, configKey, title = null, options = []) {
+    const container = document.createElement("div");
+    container.className =
+      "bilibili-blacklist-panel-row bilibili-blacklist-setting-select-row";
+    container.title = title;
+
+    const label = document.createElement("span");
+    label.textContent = labelText;
+
+    const select = document.createElement("select");
+    select.className = "bilibili-blacklist-select";
+    select.addEventListener("change", () => {
+      globalPluginConfig[configKey] = select.value;
+      saveGlobalConfigToStorage();
+    });
+
+    // 按当前配置值选中对应项
+    options.forEach((opt) => {
+      const option = document.createElement("option");
+      option.value = opt.value;
+      option.textContent = opt.label;
+      if (String(globalPluginConfig[configKey]) === String(opt.value)) {
+        option.selected = true;
+      }
+      select.appendChild(option);
+    });
+
+    container.appendChild(label);
+    container.appendChild(select);
+    return container;
+  }
+
   /**
    * 刷新面板中的配置设置显示。
    */
@@ -443,25 +440,18 @@ function loadUiModule() {
 
     // 临时开关按钮
     const tempToggleContainer = document.createElement("div");
-    tempToggleContainer.style.display = "flex";
-    tempToggleContainer.style.alignItems = "center";
-    tempToggleContainer.style.marginBottom = "8px";
-    tempToggleContainer.style.gap = "8px";
-    tempToggleContainer.style.margin = "20px 0";
+    tempToggleContainer.className =
+      "bilibili-blacklist-panel-row bilibili-blacklist-temp-toggle";
 
     const tempToggleLabel = document.createElement("span");
     tempToggleLabel.textContent = "临时开关";
-    tempToggleLabel.style.flex = "1";
 
     tempUnblockButton = document.createElement("button");
+    tempUnblockButton.className = "bilibili-blacklist-config-btn";
     tempUnblockButton.textContent = isShowAllVideos ? "恢复屏蔽" : "取消屏蔽";
     tempUnblockButton.style.background = isShowAllVideos
       ? "#dddddd"
       : "#fb7299";
-    tempUnblockButton.style.padding = "6px 12px";
-    tempUnblockButton.style.border = "none";
-    tempUnblockButton.style.cursor = "pointer";
-    tempUnblockButton.style.color = "#fff";
     tempUnblockButton.addEventListener("click", toggleShowAllBlockedVideos);
 
     tempToggleContainer.appendChild(tempToggleLabel);
@@ -470,8 +460,6 @@ function loadUiModule() {
 
     const title = document.createElement("h4");
     title.textContent = "全局配置开关(部分功能刷新后生效)";
-    title.style.fontWeight = "bold";
-    title.style.marginBottom = "12px";
     configListElement.appendChild(title);
 
     // 添加配置切换按钮
@@ -499,24 +487,17 @@ function loadUiModule() {
 
     // 标签缓存数量显示与清除按钮
     const tagNameListControlContainer = document.createElement("div");
-    tagNameListControlContainer.style.display = "flex";
-    tagNameListControlContainer.style.alignItems = "center";
-    tagNameListControlContainer.style.marginBottom = "8px";
-    tagNameListControlContainer.style.gap = "8px";
+    tagNameListControlContainer.className =
+      "bilibili-blacklist-panel-row bilibili-blacklist-cache-control";
     tagNameListControlContainer.title = "打开视频播放页面可刷新";
 
     const tagNameListLabel = document.createElement("span");
     tagNameListLabel.textContent = `分类标签缓存数量: ${tagNameList.length}`;
-    tagNameListLabel.style.flex = "1";
 
     const clearTagNameListButton = document.createElement("button");
+    clearTagNameListButton.className =
+      "bilibili-blacklist-config-btn bilibili-blacklist-config-btn-danger";
     clearTagNameListButton.textContent = "清除";
-    clearTagNameListButton.style.padding = "6px 12px";
-    clearTagNameListButton.style.backgroundColor = "#f56c6c";
-    clearTagNameListButton.style.color = "#fff";
-    clearTagNameListButton.style.border = "none";
-    clearTagNameListButton.style.borderRadius = "4px";
-    clearTagNameListButton.style.cursor = "pointer";
     clearTagNameListButton.addEventListener("click", () => {
       if (confirm("确定要清除分类标签缓存吗？这不会影响已屏蔽的标签，但会使得下次需要重新从API获取标签信息。")) {
         tagNameList.length = 0;
@@ -552,11 +533,22 @@ function loadUiModule() {
       )
     );
 
+    // 自动连播遇到被屏蔽视频的处理方式
+    configListElement.appendChild(
+      createSettingSelect(
+        "自动连播遇到被屏蔽视频:",
+        "flagSkipBlockedAutoplay",
+        "播放页开启自动连播并播到被屏蔽视频时：切换为未屏蔽视频 / 停止播放 / 不处理（按B站默认继续播放）。",
+        [
+          { value: "skip", label: "切换为未屏蔽视频" },
+          { value: "stop", label: "停止播放" },
+          { value: "off", label: "不处理(默认)" },
+        ]
+      )
+    );
+
     //分割线
     const hr = document.createElement("hr");
-    hr.style.margin = "12px 0";
-    hr.style.border = "none";
-    hr.style.borderTop = "2px solid #ddd";
     configListElement.appendChild(hr);
 
     configListElement.appendChild(
@@ -648,42 +640,21 @@ function loadUiModule() {
     managerPanel = document.createElement("div");
     managerPanel.id = "bilibili-blacklist-manager-panel"; // 确保ID唯一
 
-    // 设置面板样式
-    managerPanel.style.position = "fixed";
-    managerPanel.style.top = "50%";
-    managerPanel.style.left = "50%";
-    managerPanel.style.transform = "translate(-50%, -50%)";
-    managerPanel.style.width = "500px";
-    managerPanel.style.maxHeight = "80vh";
-    managerPanel.style.borderRadius = "8px";
-    managerPanel.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.15)";
-    managerPanel.style.zIndex = "99999";
-    managerPanel.style.overflow = "hidden";
-    managerPanel.style.display = "none"; // 默认隐藏
-    managerPanel.style.flexDirection = "column";
-
     // 创建标签容器
     const tabContainer = document.createElement("div");
-    tabContainer.style.display = "flex";
-    tabContainer.style.borderBottom = "1px solid #f1f2f3";
+    tabContainer.className = "bilibili-blacklist-tabs";
 
     // 创建各个标签页的内容区域
     const exactContent = document.createElement("div");
-    exactContent.style.padding = "16px";
-    exactContent.style.overflowY = "auto";
-    exactContent.style.flex = "1";
+    exactContent.className = "bilibili-blacklist-panel-content";
     exactContent.style.display = "block"; // 默认显示精确匹配
 
     const regexContent = document.createElement("div");
-    regexContent.style.padding = "16px";
-    regexContent.style.overflowY = "auto";
-    regexContent.style.flex = "1";
+    regexContent.className = "bilibili-blacklist-panel-content";
     regexContent.style.display = "none";
 
     const tnameContent = document.createElement("div");
-    tnameContent.style.padding = "16px";
-    tnameContent.style.overflowY = "auto";
-    tnameContent.style.flex = "1";
+    tnameContent.className = "bilibili-blacklist-panel-content";
     tnameContent.style.display = "none";
 
     const videoTagContent = document.createElement("div");
@@ -693,9 +664,7 @@ function loadUiModule() {
     videoTagContent.style.display = "none";
 
     const configContent = document.createElement("div");
-    configContent.style.padding = "16px";
-    configContent.style.overflowY = "auto";
-    configContent.style.flex = "1";
+    configContent.className = "bilibili-blacklist-panel-content";
     configContent.style.display = "none";
 
     // 定义标签页数据
@@ -708,10 +677,8 @@ function loadUiModule() {
     ];
     tabs.forEach((tabData) => {
       const tab = document.createElement("div");
+      tab.className = "bilibili-blacklist-tab";
       tab.textContent = tabData.name;
-      tab.style.padding = "12px 16px";
-      tab.style.cursor = "pointer";
-      tab.style.fontWeight = "500";
       tab.style.borderBottom =
         tabData.content.style.display === "block"
           ? "2px solid #fb7299"
@@ -733,11 +700,7 @@ function loadUiModule() {
 
     // 创建面板头部
     const header = document.createElement("div");
-    header.style.padding = "16px";
-    header.style.borderBottom = "1px solid #f1f2f3";
-    header.style.display = "flex";
-    header.style.justifyContent = "space-between";
-    header.style.alignItems = "center";
+    header.className = "bilibili-blacklist-panel-header";
 
     blockCountTitleElement = document.createElement("h3");
     blockCountTitleElement.style.margin = "0";
@@ -745,11 +708,8 @@ function loadUiModule() {
     blockCountTitleElement.title = "总数 =(UP/标题 + 广告 + CM + 分类/竖屏 + 视频标签)";
 
     const closeBtn = document.createElement("button");
+    closeBtn.className = "bilibili-blacklist-panel-close";
     closeBtn.textContent = "×";
-    closeBtn.style.background = "none";
-    closeBtn.style.border = "none";
-    closeBtn.style.cursor = "pointer";
-    closeBtn.style.padding = "0 8px";
     closeBtn.addEventListener("click", () => {
       managerPanel.style.display = "none";
     });
@@ -758,33 +718,19 @@ function loadUiModule() {
     header.appendChild(closeBtn);
 
     const contentContainer = document.createElement("div");
-    contentContainer.style.display = "flex";
-    contentContainer.style.flexDirection = "column";
-    contentContainer.style.flex = "1";
-    contentContainer.style.overflow = "hidden";
+    contentContainer.className = "bilibili-blacklist-panel-body";
 
     // 精确匹配添加输入框和按钮
     const addExactContainer = document.createElement("div");
-    addExactContainer.style.display = "flex";
-    addExactContainer.style.marginBottom = "16px";
-    addExactContainer.style.gap = "8px";
+    addExactContainer.className = "bilibili-blacklist-add-row";
 
     const exactInput = document.createElement("input");
     exactInput.type = "text";
     exactInput.placeholder = "输入要屏蔽的UP主名称";
-    exactInput.style.flex = "1";
-    exactInput.style.padding = "8px";
-    exactInput.style.border = "1px solid #ddd";
-    exactInput.style.borderRadius = "4px";
 
     const addExactBtn = document.createElement("button");
+    addExactBtn.className = "bilibili-blacklist-primary-btn";
     addExactBtn.textContent = "添加";
-    addExactBtn.style.padding = "8px 16px";
-    addExactBtn.style.background = "#fb7299";
-    addExactBtn.style.color = "#fff";
-    addExactBtn.style.border = "none";
-    addExactBtn.style.borderRadius = "4px";
-    addExactBtn.style.cursor = "pointer";
     addExactBtn.addEventListener("click", () => {
       const upName = exactInput.value.trim();
       if (upName) {
@@ -798,26 +744,15 @@ function loadUiModule() {
 
     // 正则匹配添加输入框和按钮
     const addRegexContainer = document.createElement("div");
-    addRegexContainer.style.display = "flex";
-    addRegexContainer.style.marginBottom = "16px";
-    addRegexContainer.style.gap = "8px";
+    addRegexContainer.className = "bilibili-blacklist-add-row";
 
     const regexInput = document.createElement("input");
     regexInput.type = "text";
     regexInput.placeholder = "输入正则表达式 (如: 小小.*Official)";
-    regexInput.style.flex = "1";
-    regexInput.style.padding = "8px";
-    regexInput.style.border = "1px solid #ddd";
-    regexInput.style.borderRadius = "4px";
 
     const addRegexBtn = document.createElement("button");
+    addRegexBtn.className = "bilibili-blacklist-primary-btn";
     addRegexBtn.textContent = "添加";
-    addRegexBtn.style.padding = "8px 16px";
-    addRegexBtn.style.background = "#fb7299";
-    addRegexBtn.style.color = "#fff";
-    addRegexBtn.style.border = "none";
-    addRegexBtn.style.borderRadius = "4px";
-    addRegexBtn.style.cursor = "pointer";
     addRegexBtn.addEventListener("click", () => {
       const regex = regexInput.value.trim();
       if (regex && !regexMatchBlacklist.includes(regex)) {
@@ -872,21 +807,12 @@ function loadUiModule() {
     // 创建列表元素
     exactMatchListElement = document.createElement("ul");
     exactMatchListElement.id = "bilibili-blacklist-exact-list";
-    exactMatchListElement.style.listStyle = "none";
-    exactMatchListElement.style.padding = "0";
-    exactMatchListElement.style.margin = "0";
 
     regexMatchListElement = document.createElement("ul");
     regexMatchListElement.id = "bilibili-blacklist-regex-list";
-    regexMatchListElement.style.listStyle = "none";
-    regexMatchListElement.style.padding = "0";
-    regexMatchListElement.style.margin = "0";
 
     tagNameListElement = document.createElement("ul");
     tagNameListElement.id = "bilibili-blacklist-tname-list";
-    tagNameListElement.style.listStyle = "none";
-    tagNameListElement.style.padding = "0";
-    tagNameListElement.style.margin = "0";
 
     videoTagListElement = document.createElement("ul");
     videoTagListElement.id = "bilibili-blacklist-video-tag-list";
@@ -896,9 +822,6 @@ function loadUiModule() {
 
     configListElement = document.createElement("ul");
     configListElement.id = "bilibili-blacklist-config-list";
-    configListElement.style.listStyle = "none";
-    configListElement.style.padding = "0";
-    configListElement.style.margin = "0";
 
     refreshAllPanelTabs(); // 初始化所有标签页内容
     exactContent.appendChild(exactMatchListElement);
@@ -925,133 +848,390 @@ function loadUiModule() {
    * 为插件添加全局CSS样式。
    */
   GM_addStyle(`
-        .bilibili-blacklist-block-container {
-          display: none;
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 20px;
-          margin-top: 5px;
-          padding: 0 5px;
-          font-size: 12px;
-          flex-direction: row;
-          justify-content: space-between;
-          align-items: center;
-          gap: 3px;
-          z-index: 9999;
-          pointer-events: none;
-          text-align:center;
+    /* ===== 屏蔽按钮容器 ===== */
+    .bilibili-blacklist-block-container {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 2px;
+      font-size: 12px;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      gap: 3px;
+      z-index: 9999;
+      pointer-events: none;
+    }
 
-      }
+    .bili-video-card:hover .bilibili-blacklist-block-container,
+    .card-box:hover .bilibili-blacklist-block-container,
+    .bilibili-blacklist-block-container-host:hover .bilibili-blacklist-block-container {
+      display: flex !important;
+    }
 
-      .bili-video-card:hover .bilibili-blacklist-block-container,
-      .card-box:hover .bilibili-blacklist-block-container {
-          display: flex !important;
-          pointer-events: none;
-      }
-      .card-box .bilibili-blacklist-block-container
-      {
-        flex-direction: column;
-        align-items: flex-start;
-        height: 100%;
-      }
-      .card-box .bilibili-blacklist-tname-group
-      {
-        flex-direction: column;
-        align-items: flex-end;
-        bottom: 0;
-      }
-      .card-box .bilibili-blacklist-tname-group .bilibili-blacklist-tname
-      {
-        background-color:rgba(255, 255, 255, 0.87);
-        color: #9499A0;
-        border: 1px solid #9499A0;
-      }
+    .card-box .bilibili-blacklist-block-container {
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: flex-start;
+      height: 100%;
+    }
 
-      .bilibili-blacklist-block-btn {
-          position: static;
-          display: flex;
-          width: 40px;
-          height: 20px;
-          justify-content: center;
-          align-items: center;
-          pointer-events: auto !important;
-          background-color: #fb7299dd;
-          color: white;
-          border-radius: 10%;
-          cursor: pointer;
-          text-align: center;
-      }
+    .card-box .bilibili-blacklist-tname-group {
+      flex-direction: column;
+      align-items: flex-end;
+      margin-top: auto;
+    }
 
-      .bilibili-blacklist-tname-group {
-          display: flex;
-          flex-direction: row;
-          padding:0 5px;
-          gap: 3px;
-          align-items: center;
-          margin-left: auto;
-          max-width: 80%;
-          pointer-events: none;
-      }
+    /* btn / reason / tname 共用基础外观 */
+    .bilibili-blacklist-block-btn,
+    .bilibili-blacklist-block-reason,
+    .bilibili-blacklist-tname {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 20px;
+      padding: 0 6px;
+      box-sizing: border-box;
+      font-size: 12px;
+      line-height: 1;
+      color: white;
+      text-align: center;
+      white-space: nowrap;
+      border: none;
+      border-radius: 2px;
+    }
 
-      .bilibili-blacklist-tname {
-          background-color: #fb7299dd;
-          color: white;
-          height: 20px;
-          padding: 0 5px;
-          border-radius: 10%;
-          cursor: pointer;
-          border-radius: 2px;
-          pointer-events: auto;
-          text-align: center;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          text-overflow: ellipsis;
-          overflow: hidden;
-          white-space: nowrap;
-        }
+    .bilibili-blacklist-block-btn {
+      position: static;
+      width: 40px;
+      pointer-events: auto !important;
+      background-color: #fb7299dd;
+      cursor: pointer;
+    }
 
+    .bilibili-blacklist-block-reason {
+      background-color: #f56c6c;
+      pointer-events: none;
+    }
 
-        /* 修复视频卡片布局 */
-        .bili-video-card__cover {
-            contain: layout !important;
-        }
-        /* 面板样式 */
-        #bilibili-blacklist-manager-panel {
-            font-size: 15px;
-            color:var(--text2,#000);
-            background-color:var(--bg1,#fff);
-            opacity: 0.85;
-        }
-        #bilibili-blacklist-manager-panel h4,h3 {
-             color:var(--text2,#000);
-        }
-        /* 按钮悬停效果 */
-        #bilibili-blacklist-manager-panel button {
-            transition: background-color 0.2s;
-        }
-        #bilibili-blacklist-manager-panel button:hover {
-            opacity: 0.9;
-        }
-        /* 管理按钮悬停效果 */
-        #bilibili-blacklist-manager-button:hover svg {
-            transform: scale(1.1);
-        }
-        #bilibili-blacklist-manager-button svg {
-            transition: transform 0.2s;
-        }
-        /* 输入框聚焦效果 */
-        #"bilibili-blacklist-manager-panel input:focus {
-            outline: none;
-            border-color: #fb7299 !important;
-        }
-        /*灰度效果*/
-        .bilibili-blacklist-grayscale {
-           filter: grayscale(95%);
-        }
-    `);
+    .bilibili-blacklist-tname-group {
+      display: flex;
+      flex-direction: row;
+      padding: 0 5px;
+      gap: 3px;
+      align-items: center;
+      margin-left: auto;
+      max-width: 80%;
+      pointer-events: none;
+    }
+
+    .bilibili-blacklist-tname {
+      background-color: #fb7299dd;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    /* ===== 修复视频卡片布局 ===== */
+    .bili-video-card__cover {
+      contain: layout !important;
+    }
+
+    /* ===== 管理面板 ===== */
+    #bilibili-blacklist-manager-panel {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 500px;
+      max-height: 80vh;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 99999;
+      overflow: hidden;
+      display: none;
+      flex-direction: column;
+      font-size: 15px;
+      color: var(--text2, #000);
+      background-color: var(--bg1, #fff);
+      opacity: 0.85;
+    }
+
+    #bilibili-blacklist-manager-panel h3,
+    #bilibili-blacklist-manager-panel h4 {
+      color: var(--text2, #000);
+    }
+
+    #bilibili-blacklist-manager-panel h3 {
+      margin: 0;
+      font-weight: 500;
+    }
+
+    #bilibili-blacklist-manager-panel h4 {
+      font-weight: bold;
+      margin-bottom: 12px;
+    }
+
+    #bilibili-blacklist-manager-panel ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    #bilibili-blacklist-manager-panel hr {
+      margin: 12px 0;
+      border: none;
+      border-top: 2px solid #ddd;
+    }
+
+    /* 按钮基础交互 */
+    #bilibili-blacklist-manager-panel button {
+      transition: background-color 0.2s;
+    }
+
+    #bilibili-blacklist-manager-panel button:hover {
+      opacity: 0.9;
+    }
+
+    /* 输入框 */
+    #bilibili-blacklist-manager-panel input:focus {
+      outline: none;
+      border-color: #fb7299 !important;
+    }
+
+    #bilibili-blacklist-manager-panel input[type="text"] {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    #bilibili-blacklist-manager-panel select {
+      flex: 1;
+      min-width: 120px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      color: var(--text2, #000);
+      background-color: var(--bg1, #fff);
+    }
+
+    .bilibili-blacklist-setting-select-row {
+      margin-bottom: 8px;
+    }
+
+    /* 面板结构 */
+    .bilibili-blacklist-tabs {
+      display: flex;
+      border-bottom: 1px solid #f1f2f3;
+    }
+
+    .bilibili-blacklist-tab {
+      padding: 12px 16px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .bilibili-blacklist-panel-content {
+      padding: 16px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .bilibili-blacklist-panel-header {
+      padding: 16px;
+      border-bottom: 1px solid #f1f2f3;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .bilibili-blacklist-panel-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0 8px;
+      color: var(--text2, #000);
+    }
+
+    .bilibili-blacklist-panel-body {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* 布局行 */
+    .bilibili-blacklist-panel-row,
+    .bilibili-blacklist-add-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .bilibili-blacklist-panel-row > span:first-child {
+      flex: 1;
+    }
+
+    .bilibili-blacklist-add-row {
+      margin-bottom: 16px;
+    }
+
+    .bilibili-blacklist-setting-toggle {
+      margin-bottom: 8px;
+    }
+
+    .bilibili-blacklist-setting-input-row {
+      margin-top: 16px;
+    }
+
+    .bilibili-blacklist-temp-toggle {
+      margin: 20px 0;
+    }
+
+    .bilibili-blacklist-cache-control {
+      margin-bottom: 8px;
+    }
+
+    /* 列表项 */
+    .bilibili-blacklist-list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #f1f2f3;
+    }
+
+    .bilibili-blacklist-list-item > span {
+      flex: 1;
+    }
+
+    .bilibili-blacklist-empty {
+      text-align: center;
+      padding: 16px;
+      color: #999;
+    }
+
+    /* 按钮 */
+    .bilibili-blacklist-panel-btn,
+    .bilibili-blacklist-config-btn,
+    .bilibili-blacklist-primary-btn {
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+
+    .bilibili-blacklist-panel-btn {
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .bilibili-blacklist-config-btn {
+      padding: 6px 12px;
+      border-radius: 4px;
+    }
+
+    .bilibili-blacklist-config-btn-primary {
+      background-color: #fb7299;
+    }
+
+    .bilibili-blacklist-config-btn-danger {
+      background-color: #f56c6c;
+    }
+
+    .bilibili-blacklist-primary-btn {
+      padding: 8px 16px;
+      background: #fb7299;
+      border-radius: 4px;
+    }
+
+    .bilibili-blacklist-number-input {
+      width: 100px;
+      padding: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    /* ===== 顶栏管理按钮 ===== */
+    #bilibili-blacklist-manager-button {
+      cursor: pointer;
+    }
+
+    #bilibili-blacklist-manager-button .right-entry-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #bilibili-blacklist-manager-button .right-entry__outside {
+      margin-bottom: -5px;
+    }
+
+    #bilibili-blacklist-manager-button:hover svg {
+      transform: scale(1.1);
+    }
+
+    #bilibili-blacklist-manager-button svg {
+      transition: transform 0.2s;
+    }
+
+    /* ===== 卡比覆盖层 ===== */
+    #bilibili-blacklist-kirby {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+      z-index: 10;
+      border-radius: 6px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: opacity ${KIRBY_FADE_DURATION_MS / 1000}s ease;
+    }
+
+    #bilibili-blacklist-kirby.bilibili-blacklist-kirby-video {
+      justify-content: flex-start;
+      
+    }
+
+    #bilibili-blacklist-kirby svg {
+      opacity: 0.15;
+      filter: none;
+      margin-top: -40px;
+    }
+
+    #bilibili-blacklist-kirby.bilibili-blacklist-kirby-video svg {
+      margin-top: -10px;
+    }
+
+    /* ===== 用户空间页屏蔽按钮 ===== */
+    .bilibili-blacklist-up-block-btn-host {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .bilibili-blacklist-up-block-btn {
+      width: 100px;
+      height: 30px;
+      margin-left: 10px;
+      color: #fff;
+      border-radius: 5px;
+      border: 1px solid #fb7299;
+    }
+
+    /* ===== 灰度效果 ===== */
+    .bilibili-blacklist-grayscale {
+      filter: grayscale(95%);
+    }
+  `);
 
   /**
    * 返回卡比图标的SVG代码。
@@ -1081,13 +1261,63 @@ function loadUiModule() {
   }
 
   /**
+   * 渐显卡比覆盖层（鼠标移开后恢复遮挡）。
+   * @param {HTMLElement} overlay - 卡比覆盖层元素。
+   */
+  function fadeInKirbyOverlay(overlay) {
+    if (!overlay) return;
+    const pendingTimer = kirbyFadeTimers.get(overlay);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      kirbyFadeTimers.delete(overlay);
+    }
+    overlay.style.display = "flex";
+    overlay.style.opacity = "0";
+    void overlay.offsetHeight; // 强制重排以触发过渡动画
+    overlay.style.opacity = "1";
+  }
+
+  /**
+   * 渐隐卡比覆盖层（悬停临时显示视频）。
+   * @param {HTMLElement} overlay - 卡比覆盖层元素。
+   */
+  function fadeOutKirbyOverlay(overlay) {
+    if (!overlay) return;
+    const pendingTimer = kirbyFadeTimers.get(overlay);
+    if (pendingTimer) clearTimeout(pendingTimer);
+    overlay.style.opacity = "0";
+    kirbyFadeTimers.set(
+      overlay,
+      setTimeout(() => {
+        kirbyFadeTimers.delete(overlay);
+        if (overlay.isConnected && overlay.style.opacity === "0") {
+          overlay.style.display = "none";
+        }
+      }, KIRBY_FADE_DURATION_MS)
+    );
+  }
+
+  /**
+   * 取消卡比覆盖层的渐隐/渐显计时器。
+   * @param {HTMLElement} overlay - 卡比覆盖层元素。
+   */
+  function cancelKirbyFade(overlay) {
+    if (!overlay) return;
+    const pendingTimer = kirbyFadeTimers.get(overlay);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      kirbyFadeTimers.delete(overlay);
+    }
+  }
+
+  /**
    * 恢复所有被悬停临时显示的视频遮罩。
    */
   function restoreAllBlockedVideoOverlays() {
     if (isShowAllVideos) return;
     blockedVideoCards.forEach((card) => {
       const overlay = card.querySelector("#bilibili-blacklist-kirby");
-      if (overlay) overlay.style.display = "flex";
+      if (overlay) fadeInKirbyOverlay(overlay);
     });
   }
 
@@ -1109,6 +1339,12 @@ function loadUiModule() {
         return;
       }
 
+      const overlayOnEnter = cardElement.querySelector(
+        "#bilibili-blacklist-kirby"
+      );
+      // 若正在渐隐，先取消，避免悬停期间遮罩消失
+      cancelKirbyFade(overlayOnEnter);
+
       const existingTimer = hoverRevealTimers.get(cardElement);
       if (existingTimer) clearTimeout(existingTimer);
 
@@ -1124,7 +1360,7 @@ function loadUiModule() {
           "#bilibili-blacklist-kirby"
         );
         if (overlay && blockedVideoCards.has(realCard)) {
-          overlay.style.display = "none";
+          fadeOutKirbyOverlay(overlay);
         }
       }, delaySeconds * 1000);
       hoverRevealTimers.set(cardElement, timer);
@@ -1143,7 +1379,7 @@ function loadUiModule() {
         overlay &&
         blockedVideoCards.has(getRealVideoCardElement(cardElement))
       ) {
-        overlay.style.display = "flex";
+        fadeInKirbyOverlay(overlay);
       }
     });
   }
@@ -1159,50 +1395,29 @@ function loadUiModule() {
     const kirbyWrapper = document.createElement("div");
     kirbyWrapper.innerHTML = getKirbySVG();
     kirbyWrapper.id = "bilibili-blacklist-kirby";
-
-    const justifyContent = isCurrentPageVideo() ? "flex-start" : "center";
-    const alignItems = isCurrentPageVideo() ? "flex-start" : "center";
-    Object.assign(kirbyWrapper.style, {
-      position: "absolute",
-      top: "0",
-      left: "0",
-      width: "100%",
-      height: "100%",
-      pointerEvents: "none",
-      display: "flex",
-      justifyContent: `${justifyContent}`,
-      alignItems: `${alignItems}`,
-      zIndex: "10",
-      backgroundColor: "rgba(255, 255, 255, 0.7)",
-      backdropFilter: "blur(5px)",
-      WebkitBackdropFilter: "blur(5px)", // 兼容性
-      borderRadius: "inherit",
-      border: "1px solid rgba(255, 255, 255, 0.5)",
-    });
+    if (isCurrentPageVideo()) {
+      kirbyWrapper.classList.add("bilibili-blacklist-kirby-video");
+    }
 
     const svg = kirbyWrapper.querySelector("svg");
     if (svg) {
       const cardRect = cardElement.getBoundingClientRect();
-      const size = Math.min(cardRect.width, cardRect.height) * 1.0;
+      const size = Math.min(cardRect.width, cardRect.height) * 0.8;
       svg.setAttribute("width", `${size}px`);
       svg.setAttribute("height", `${size}px`);
-      svg.setAttribute("bottom", `${cardRect.height - size}px`);
-      svg.style.opacity = "0.15";
-      svg.style.filter = "none";
-      if (isCurrentPageVideo()) {
-        svg.style.marginTop = "-10px"; // 视频播放页的微调
-      } else {
-        svg.style.marginTop = "-40px"; // 其他页面的微调
-      }
     }
 
-    // 确保卡片有position属性以便子元素绝对定位
-    const cardStyle = getComputedStyle(cardElement);
-    if (cardStyle.position === "static" || !cardStyle.position) {
-      cardElement.style.position = "relative";
+    const hostElement = isCurrentPageCategory()
+      ? cardElement.querySelector(".bili-video-card") || cardElement
+      : cardElement;
+
+    // 确保宿主元素有position属性以便子元素绝对定位
+    const hostStyle = getComputedStyle(hostElement);
+    if (hostStyle.position === "static" || !hostStyle.position) {
+      hostElement.style.position = "relative";
     }
 
-    cardElement.appendChild(kirbyWrapper);
+    hostElement.appendChild(kirbyWrapper);
   }
 
   /**

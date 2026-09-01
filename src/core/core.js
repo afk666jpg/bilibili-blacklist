@@ -19,7 +19,6 @@ function loadCoreModule() {
   let videoCardProcessQueue = new Set(); // 存储待处理的卡片，用于统一的队列处理
   let isVideoCardQueueProcessing = false; // 是否正在处理队列
   let isPageCurrentlyActive = true; // 页面是否可见
-  let observerRetryCount = 0; // 观察器重试计数
   let countBlockInfo = 0; // 已屏蔽视频计数
   let countBlockAD = 0; // 已屏蔽广告计数
   let countBlockTName = 0; // 已屏蔽标签名计数
@@ -31,6 +30,9 @@ function loadCoreModule() {
     ".bili-video-card__info--author", // 主页
     ".bili-video-card__author", // 分类页面 -> span title
     ".name", // 视频播放页
+    ".upname a span", // 视频播放页“接下来播放/相关推荐”卡片（新版结构）
+    ".upname a",
+    ".upname",
   ];
 
   // 用于不同页面视频标题选择器
@@ -40,6 +42,63 @@ function loadCoreModule() {
     ".title", // 视频播放页
   ];
 
+  // 屏蔽类型对应的原因文案
+  const BLOCK_REASON_MAP = {
+    info: "标题/UP主名",
+    ad: "广告",
+    tname: "分类标签",
+    cm: "软广",
+    vertical: "竖屏视频",
+  };
+
+  /**
+   * 获取视频卡片上容器应挂载的宿主元素，并确保宿主可被绝对定位。
+   * @param {HTMLElement} cardElement - 视频卡片元素。
+   * @returns {HTMLElement} 容器宿主元素。
+   */
+  function getBlockContainerHost(cardElement) {
+    // 视频播放页面的视频卡片结构特殊，需要调整位置
+    if (isCurrentPageVideo()) {
+      const cardBox = cardElement.querySelector(".card-box");
+      if (cardBox) {
+        cardBox.style.position = "relative";
+        cardBox.classList.add("bilibili-blacklist-block-container-host");
+        return cardBox;
+      }
+    } else if (isCurrentPageCategory()) {
+      // 分类页面的视频卡片结构特殊，需要调整位置
+      const biliVideoCard = cardElement.querySelector(".bili-video-card");
+      if (biliVideoCard) {
+        biliVideoCard.classList.add("bilibili-blacklist-block-container-host");
+        return biliVideoCard;
+      }
+    }
+    // 默认宿主：确保可被绝对定位的子元素正常显示
+    const hostStyle = getComputedStyle(cardElement);
+    if (hostStyle.position === "static" || !hostStyle.position) {
+      cardElement.style.position = "relative";
+    }
+    cardElement.classList.add("bilibili-blacklist-block-container-host");
+    return cardElement;
+  }
+
+  /**
+   * 确保视频卡片上存在屏蔽容器，不存在则创建（用于广告等未走扫描流程的卡片）。
+   * @param {HTMLElement} cardElement - 视频卡片元素。
+   * @returns {HTMLElement} 已存在的或新创建的容器元素。
+   */
+  function ensureBlockContainerOnCard(cardElement) {
+    const existing = cardElement.querySelector(
+      ".bilibili-blacklist-block-container"
+    );
+    if (existing) return existing;
+    const container = document.createElement("div");
+    container.classList.add("bilibili-blacklist-block-container");
+    const host = getBlockContainerHost(cardElement);
+    host.appendChild(container);
+    return container;
+  }
+
   /**
    * 为视频卡片添加屏蔽按钮容器。
    * @param {string} upName - UP主名称。
@@ -47,49 +106,33 @@ function loadCoreModule() {
    * @returns {HTMLElement} 创建的容器元素。
    */
   function addBlockContainerToCard(upName, cardElement) {
-    if (!cardElement.querySelector(".bilibili-blacklist-block-container")) {
-      const container = document.createElement("div");
-      container.classList.add("bilibili-blacklist-block-container");
-
-      if (!cardElement.querySelector(".bilibili-blacklist-block-btn")) {
-        const blockButton = createBlockUpButton(upName, cardElement);
-        if (isCurrentPageVideo()) {
-          // 视频播放页面的视频卡片结构特殊，需要调整位置
-          cardElement.querySelector(".card-box").style.position = "relative";
-          cardElement.querySelector(".card-box").appendChild(container);
-        } else if (isCurrentPageCategory()) {
-          // 分类页面的视频卡片结构特殊，需要调整位置
-          cardElement.querySelector(".bili-video-card").appendChild(container);
-        } else {
-          cardElement.appendChild(container);
-        }
-        container.appendChild(blockButton);
-      }
-      return cardElement.querySelector(".bilibili-blacklist-block-container");
+    const container = ensureBlockContainerOnCard(cardElement);
+    if (!container.querySelector(".bilibili-blacklist-block-btn")) {
+      const blockButton = createBlockUpButton(upName, cardElement);
+      container.appendChild(blockButton);
     }
-    return cardElement.querySelector(".bilibili-blacklist-block-container");
+    return container;
   }
 
   /**
    * 隐藏给定的视频卡片。
    * @param {HTMLElement} cardElement - 要隐藏的视频卡片元素。
-   * @param {string} type - 隐藏类型，默认为"info"。
+   * @param {string} type - 隐藏类型，默认为"none"。
    * @returns {void}
    *
    */
   function hideVideoCard(cardElement, type = "none") {
     const realCardToBlock = getRealVideoCardElement(cardElement);
-    if (!blockedVideoCards.has(realCardToBlock)) {
-      blockedVideoCards.add(realCardToBlock);
-    } else {
-      return;
-    }
     if (!realCardToBlock) {
       console.warn(
         "[bililili-blacklist] hideVideoCard: realCardToBlock is null"
       );
       return;
     }
+    if (blockedVideoCards.has(realCardToBlock)) {
+      return;
+    }
+    blockedVideoCards.add(realCardToBlock);
     if (type === "info") {
       countBlockInfo++;
     }
@@ -108,12 +151,59 @@ function loadCoreModule() {
     if (type === "vertical") {
       countBlockTName++;
     }
-    //console.log(type);
 
     if (globalPluginConfig.flagKirby) {
       addKirbyOverlayToCard(cardElement);
     } else {
       realCardToBlock.style.display = "none";
+    }
+
+    setBlockReasonOnCard(cardElement, type);
+  }
+
+  /**
+   * 在卡片的屏蔽按钮容器中设置屏蔽原因。
+   * @param {HTMLElement} cardElement - 视频卡片元素。
+   * @param {string} type - 屏蔽类型。
+   */
+  function setBlockReasonOnCard(cardElement, type) {
+    const reasonText = BLOCK_REASON_MAP[type];
+    if (!reasonText) return;
+    // 广告等卡片未经过 scanAndBlockVideoCards 流程，可能不存在容器，需确保创建
+    const container = ensureBlockContainerOnCard(cardElement);
+    let reasonElement = container.querySelector(
+      ".bilibili-blacklist-block-reason"
+    );
+    if (!reasonElement) {
+      reasonElement = document.createElement("span");
+      reasonElement.className = "bilibili-blacklist-block-reason";
+      // 位于"屏蔽"按钮之后、标签组之前
+      const tnameGroup = container.querySelector(
+        ".bilibili-blacklist-tname-group"
+      );
+      if (tnameGroup) {
+        container.insertBefore(reasonElement, tnameGroup);
+      } else {
+        container.appendChild(reasonElement);
+      }
+    }
+    reasonElement.textContent = `屏蔽原因: ${reasonText}`;
+  }
+
+  /**
+   * 移除卡片上的屏蔽原因显示。
+   * @param {HTMLElement} cardElement - 视频卡片元素。
+   */
+  function removeBlockReason(cardElement) {
+    const container = cardElement.querySelector(
+      ".bilibili-blacklist-block-container"
+    );
+    if (!container) return;
+    const reasonElement = container.querySelector(
+      ".bilibili-blacklist-block-reason"
+    );
+    if (reasonElement) {
+      reasonElement.remove();
     }
   }
 
@@ -256,7 +346,11 @@ function loadCoreModule() {
       if (globalPluginConfig.flagKirby) {
         const kirbyOverlay = card.querySelector("#bilibili-blacklist-kirby");
         if (kirbyOverlay) {
-          kirbyOverlay.style.display = isShowAllVideos ? "none" : "flex";
+          if (isShowAllVideos) {
+            kirbyOverlay.style.display = "none";
+          } else {
+            fadeInKirbyOverlay(kirbyOverlay);
+          }
         }
         card.style.display = "block";
       } else {
@@ -314,14 +408,13 @@ function loadCoreModule() {
     }
 
     // 检查正则匹配黑名单
-    if (
-      regexMatchBlacklist.some((regex) => new RegExp(regex, "i").test(upName))
-    ) {
+    const regexList = regexMatchBlacklist.map(
+      (regex) => new RegExp(regex, "i")
+    );
+    if (regexList.some((regex) => regex.test(upName))) {
       return true;
     }
-    if (
-      regexMatchBlacklist.some((regex) => new RegExp(regex, "i").test(title))
-    ) {
+    if (regexList.some((regex) => regex.test(title))) {
       return true;
     }
     return false;
@@ -340,7 +433,7 @@ function loadCoreModule() {
         saveBlacklistsToStorage();
         refreshAllPanelTabs();
         if (cardElement) {
-          hideVideoCard(cardElement);
+          hideVideoCard(cardElement, "info");
         }
         hideAllCardsByUpName(upName);
       }
@@ -381,7 +474,7 @@ function loadCoreModule() {
         saveBlacklistsToStorage();
         refreshAllPanelTabs();
         if (cardElement) {
-          hideVideoCard(cardElement);
+          hideVideoCard(cardElement, "tname");
         }
         hideAllCardsByTagName(tagName);
       }

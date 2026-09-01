@@ -57,8 +57,9 @@ function loadObserverModule() {
           blockVideoPageAds(); // 视频页广告屏蔽
         }
         if (!document.getElementById("bilibili-blacklist-manager-button")) {
-          addBlacklistManagerButton(); // 确保管理按钮存在
+         // addBlacklistManagerButton(); // 确保管理按钮存在
         }
+        
       }, globalPluginConfig.blockScanInterval);
     }
   });
@@ -66,7 +67,6 @@ function loadObserverModule() {
   /**
    * 在指定容器上初始化MutationObserver。
    * @param {string} containerIdOrSelector - 要观察的容器的ID或CSS选择器。
-   * @returns {boolean} 如果观察器成功初始化则返回true，否则返回false。
    */
   function initializeObserver(containerIdOrSelector) {
     const rootNode =
@@ -74,22 +74,9 @@ function loadObserverModule() {
       document.querySelector(containerIdOrSelector) ||
       document.documentElement; // 默认观察整个文档
 
-    if (rootNode) {
-      contentObserver.observe(rootNode, {
-        childList: true,
-        subtree: true,
-      });
-      return true;
-    } else {
-      // 如果未找到根节点，则进行重试
-      setTimeout(() => initializeObserver(containerIdOrSelector), 500);
-      console.warn("[bilibili-blacklist] 未找到根节点，正在重试...");
-      observerRetryCount++;
-
-      if (observerRetryCount > 10) {
-        console.error("[bilibili-blacklist] 重试次数过多，停止重试。");
-        return false;
-      }
-    }
+    contentObserver.observe(rootNode, {
+      childList: true,
+      subtree: true,
+    });
   }
 }

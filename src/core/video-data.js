@@ -21,10 +21,9 @@ function loadVideoDataModule() {
     return false;
   }
   /**
-   * 从视频卡片的链接中提取BV ID。
-   * 还处理cm.bilibili.com广告的屏蔽。
-   * @param {HTMLElement} cardElement - 视频卡片元素。
-   * @returns {string|null} BV ID，如果未找到/被屏蔽则返回null。
+   * 从视频链接中提取BV ID。
+   * @param {string} link - 视频链接。
+   * @returns {string|null} BV ID，如果未找到则返回null。
    */
   function getLinkBvId(link) {
     try {
@@ -293,6 +292,7 @@ function loadVideoDataModule() {
         if (blockedVideoCards.has(realCardToDisplay)) {
           blockedVideoCards.delete(realCardToDisplay);
         }
+        removeBlockReason(card);
         if (globalPluginConfig.flagKirby) {
           removeKirbyOverlay(card);
         }
@@ -301,7 +301,7 @@ function loadVideoDataModule() {
 
       processedVideoCards.add(card); // 标记卡片已处理
 
-      await sleep(globalPluginConfig.processQueueInterval || 100);
+      await sleep(globalPluginConfig.processQueueInterval);
     }
     isVideoCardQueueProcessing = false;
     refreshBlockCountDisplay();

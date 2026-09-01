@@ -31,19 +31,17 @@ function loadPagesModule() {
       return; // 不支持的页面不进行初始化
     }
     createBlacklistPanel(); // 创建管理面板
+    addBlacklistManagerButton(); // 立即挂载管理按钮，避免在视频页被迟到的顶栏渲染顶掉前不可见；后续由观察器兜底
     console.log("[bilibili-blacklist] 脚本已加载🥔");
     
   }
   let isfirstLoad = true;
+  let rescanVideoPageTimer = null; // 视频页定时补充扫描定时器
   // 监听DOMContentLoaded并检查readyState以进行早期初始化
+  // initializeScript 内部已通过 isfirstLoad 保证只执行一次
   document.addEventListener("DOMContentLoaded", initializeScript);
-  if (document.readyState === "complete"&& isfirstLoad) {
+  if (document.readyState === "complete" && isfirstLoad) {
       initializeScript();
-      isfirstLoad = false;
-  }
-  if (document.readyState === "interactive" && isfirstLoad) {
-      initializeScript();
-      isfirstLoad = false;
   }
 
   /**
@@ -92,15 +90,28 @@ function loadPagesModule() {
   function initializeVideoPage() {
     // **用户修改 2: 延迟 5 秒启动屏蔽功能**
     console.log("[bilibili-blacklist] 播放页已加载，将延迟 5 秒启动功能。🍇");
-
+    const flag = globalPluginConfig.flagSkipBlockedAutoplay;
+    globalPluginConfig.flagSkipBlockedAutoplay = "off";
     // 延迟 5 秒执行核心功能
     setTimeout(() => {
       initializeObserver("right-container"); // 观察视频播放页右侧推荐区域
       // 首次手动扫描和广告屏蔽
       scanAndBlockVideoCards();
       blockVideoPageAds();
+      // 自动连播遇到被屏蔽视频时的处理（停止/切换/不处理，由用户配置）
+      initAutoplaySkip();
+      // 视频页在页面内切集后，右侧推荐会原地重建；观察器可能绑定到已替换的节点，
+      // 这里定时补充扫描，确保新加载的卡片也能被处理（scanAndBlockVideoCards 内部有节流与去重）。
+      rescanVideoPageTimer = setInterval(() => {
+        scanAndBlockVideoCards();
+        globalPluginConfig.flagSkipBlockedAutoplay= flag; // 第一次打开页面时，无论如何都不做处理
+      }, 2500);
+      // 顶栏可能有数秒延迟渲染，若在这之前已超过6个li，手动补挂管理按钮
+      addBlacklistManagerButton();
+      
       console.log("[bilibili-blacklist] 视频播放页屏蔽功能已启动。");
     }, 5000); // 5000 毫秒 = 5 秒
+    
   }
 
 
@@ -167,18 +178,11 @@ function loadPagesModule() {
     }
 
     // 调整UP主名称元素的样式，以便容纳按钮
-    upNameElement.style.display = "inline-flex";
-    upNameElement.style.alignItems = "center";
+    upNameElement.classList.add("bilibili-blacklist-up-block-btn-host");
 
     const button = document.createElement("button");
     button.className = "bilibili-blacklist-up-block-btn";
     button.textContent = "屏蔽";
-    button.style.color = "#fff";
-    button.style.width = "100px";
-    button.style.height = "30px";
-    button.style.marginLeft = "10px";
-    button.style.borderRadius = "5px";
-    button.style.border = "1px solid #fb7299";
 
     // 刷新按钮状态和页面灰度效果
     const refreshButtonStatus = () => {
