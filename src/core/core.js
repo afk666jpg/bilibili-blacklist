@@ -5,6 +5,7 @@ function loadCoreModule() {
   let exactMatchListElement;
   let regexMatchListElement;
   let tagNameListElement;
+  let videoTagListElement;
   let configListElement;
   let blockCountTitleElement;
   let blockCountDisplayElement = null;
@@ -22,6 +23,7 @@ function loadCoreModule() {
   let countBlockInfo = 0; // 已屏蔽视频计数
   let countBlockAD = 0; // 已屏蔽广告计数
   let countBlockTName = 0; // 已屏蔽标签名计数
+  let countBlockVideoTag = 0; // 已屏蔽视频标签计数
   let countBlockCM = 0; // 已屏蔽cm.bilibili.com软广计数
 
   // 用于不同页面UP主名称选择器
@@ -96,6 +98,9 @@ function loadCoreModule() {
     }
     if (type === "tname") {
       countBlockTName++;
+    }
+    if (type === "videoTag") {
+      countBlockVideoTag++;
     }
     if (type === "cm") {
       countBlockCM++;
@@ -403,6 +408,45 @@ function loadCoreModule() {
   }
 
   /**
+   * 将视频标签添加到黑名单并刷新。
+   * @param {string} tagName - 要添加的视频标签名。
+   * @param {HTMLElement} [cardElement=null] - 添加后要隐藏的视频卡片元素。
+   */
+  function addToVideoTagBlacklist(tagName, cardElement = null) {
+    try {
+      if (!tagName) return;
+      if (!videoTagBlacklist.includes(tagName)) {
+        videoTagBlacklist.push(tagName);
+        saveBlacklistsToStorage();
+        refreshAllPanelTabs();
+        if (cardElement) {
+          hideVideoCard(cardElement, "videoTag");
+        }
+        hideAllCardsByVideoTag(tagName);
+      }
+    } catch (e) {
+      console.error("[bilibili-blacklist] 添加视频标签黑名单出错:", e);
+    }
+  }
+
+  /**
+   * 从视频标签黑名单中移除标签名。
+   * @param {string} tagName - 要移除的视频标签名。
+   */
+  function removeFromVideoTagBlacklist(tagName) {
+    try {
+      if (videoTagBlacklist.includes(tagName)) {
+        const index = videoTagBlacklist.indexOf(tagName);
+        videoTagBlacklist.splice(index, 1);
+        saveBlacklistsToStorage();
+        refreshVideoTagList();
+      }
+    } catch (e) {
+      console.error("[bilibili-blacklist] 移除视频标签黑名单出错:", e);
+    }
+  }
+
+  /**
    * 隐藏所有匹配指定UP主名称的视频卡片。
    * @param {string} upName - 要匹配的UP主名称。
    */
@@ -427,6 +471,20 @@ function loadCoreModule() {
     videoCards.forEach(card => {
       if (isCardBlacklistedByTagName(card)) {
         hideVideoCard(card, "tname");
+      }
+    });
+  }
+
+  /**
+   * 隐藏所有匹配指定视频标签的视频卡片。
+   * @param {string} tagName - 要匹配的视频标签名。
+   */
+  function hideAllCardsByVideoTag(tagName) {
+    const videoCards = queryAllVideoCards();
+    if (!videoCards) return;
+    videoCards.forEach((card) => {
+      if (isCardBlacklistedByVideoTag(card)) {
+        hideVideoCard(card, "videoTag");
       }
     });
   }

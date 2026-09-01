@@ -61,6 +61,34 @@ function loadVideoDataModule() {
       console.error("[bilibili-blacklist] API 请求失败:", error);
     }
   }
+
+  /**
+   * 使用BV ID从Bilibili视频详情接口获取视频标签。
+   * 该接口返回 data.View 和 data.Tags，且只传 bvid 可避免 aid 不一致导致的风控错误。
+   * @param {string} bvid - 视频的BV ID。
+   * @returns {Promise<object|null>} 包含视频信息和 videoTags 的Promise。
+   */
+  async function getBilibiliVideoDetailApiData(bvid) {
+    if (!bvid || bvid.length >= 24) {
+      return null;
+    }
+    const url = `https://api.bilibili.com/x/web-interface/wbi/view/detail?bvid=${encodeURIComponent(bvid)}`;
+    try {
+      const response = await fetch(url);
+      const json = await response.json();
+      if (json.code === 0 && json.data) {
+        const view = json.data.View || {};
+        return {
+          ...view,
+          videoTags: Array.isArray(json.data.Tags) ? json.data.Tags : [],
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error("[bilibili-blacklist] 视频详情 API 请求失败:", error);
+      return null;
+    }
+  }
   /**
    * 检查卡片是否包含任何黑名单标签。
    * @param {HTMLElement} cardElement - 视频卡片元素。
@@ -85,6 +113,23 @@ function loadVideoDataModule() {
         if (tagNameBlacklist.includes(name)) {
           return true;
         }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * 检查卡片是否包含任何被屏蔽的视频标签。
+   * @param {HTMLElement} cardElement - 视频卡片元素。
+   * @returns {boolean} 如果有视频标签被列入黑名单则返回true。
+   */
+  function isCardBlacklistedByVideoTag(cardElement) {
+    const videoTagElements = cardElement.querySelectorAll(
+      ".bilibili-blacklist-video-tag"
+    );
+    for (const videoTagElement of videoTagElements) {
+      if (videoTagBlacklist.includes(videoTagElement.textContent.trim())) {
+        return true;
       }
     }
     return false;
@@ -144,13 +189,17 @@ function loadVideoDataModule() {
       }
 
       if (
-        (globalPluginConfig.flagTName || globalPluginConfig.flagVertical) &&
+        (globalPluginConfig.flagTName ||
+          globalPluginConfig.flagVideoTag ||
+          globalPluginConfig.flagVertical) &&
         !shouldHide
       ) {
         const bvId = getLinkBvId(link);
         // 如果存在BV ID且卡片尚未添加标签组
         if (bvId && !card.querySelector(".bilibili-blacklist-tname-group")) {
-          const data = await getBilibiliVideoApiData(bvId);
+          const data = globalPluginConfig.flagVideoTag
+            ? await getBilibiliVideoDetailApiData(bvId)
+            : await getBilibiliVideoApiData(bvId);
           if (data) {
             const container = card.querySelector(
               ".bilibili-blacklist-block-container"
@@ -190,15 +239,35 @@ function loadVideoDataModule() {
                   hasTname = true;
                 }
               }
+
+              if (globalPluginConfig.flagVideoTag && Array.isArray(data.videoTags)) {
+                for (const tag of data.videoTags) {
+                  const tagName =
+                    typeof tag === "string" ? tag : tag && tag.tag_name;
+                  if (tagName) {
+                    const tagElement = createVideoTagBlockButton(tagName, card);
+                    tnameGroup.appendChild(tagElement);
+                    hasTname = true;
+                  }
+                }
+              }
               //#endregion
               if (hasTname) {
                 container.appendChild(tnameGroup);
               }
             }
 
-            if (isCardBlacklistedByTagName(card)) {
+            if (globalPluginConfig.flagTName && isCardBlacklistedByTagName(card)) {
               shouldHide = true;
               blockType = "tname";
+            }
+            if (
+              globalPluginConfig.flagVideoTag &&
+              !shouldHide &&
+              isCardBlacklistedByVideoTag(card)
+            ) {
+              shouldHide = true;
+              blockType = "videoTag";
             }
             // 如果启用了垂直视频屏蔽
             if (

@@ -18,12 +18,15 @@ function loadStorageModule() {
   ]);
   // 默认标签名黑名单
   let tagNameBlacklist = GM_getValue("tNameBlacklist", []);
+  // 默认视频标签黑名单
+  let videoTagBlacklist = GM_getValue("videoTagBlacklist", []);
 
   // 从存储中获取全局配置，并为旧版本配置补充新增字段
   const defaultGlobalPluginConfig = {
     flagInfo: true, // 启用/禁用按UP主名/标题屏蔽
     flagAD: true, // 启用/禁用屏蔽一般广告
     flagTName: true, // 启用/禁用按标签名屏蔽（需要API调用）
+    flagVideoTag: true, // 启用/禁用按视频标签屏蔽（需要API调用）
     flagCM: true, // 启用/禁用屏蔽cm.bilibili.com软广
     flagKirby: true, // 启用/禁用被屏蔽视频的卡比覆盖模式
     flagHoverReveal: false, // 启用/禁用悬停后临时显示被遮挡视频
@@ -54,6 +57,7 @@ function loadStorageModule() {
     GM_setValue("exactBlacklist", exactMatchBlacklist);
     GM_setValue("regexBlacklist", regexMatchBlacklist);
     GM_setValue("tNameBlacklist", tagNameBlacklist);
+    GM_setValue("videoTagBlacklist", videoTagBlacklist);
   }
 
   // 将全局配置保存到存储中
